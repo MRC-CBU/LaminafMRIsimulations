@@ -1,4 +1,4 @@
-function attention_simulation_contri_plots()
+function attention_simulation_contri_plots(filename)
 % Plotting results from the output of attention_simulation.m
 % This function queries the output for the parameters we are interested in
 % and generate plots comparing the ground truth against the various
@@ -12,21 +12,47 @@ int_thermal_noise = repmat(6,1,3);
 int_attention = [3 2 3];                     
 int_bias = [2, 1.5, 1];               
 
-
-
-
-
 cmap = [251,180,174;
     179,205,227];
 cmap = cmap/255;
 
+res = load(filename); 
+res = cat(1,res.all_res{:});
 
-%load res_table and var_table
-res = load('att_sim_results.mat'); 
-res_table = res.res_table;
-var_table = res.var_table;
-p25_table = res.p25_table;
-p75_table = res.p75_table;
+noiselevel.physio = unique(res(:,1));
+noiselevel.thermal = unique(res(:,2));
+superficial_bias = unique(res(:,3));
+attentional_modulation = unique(res(:,4));
+
+reps=numel(noiselevel.physio)*numel(attentional_modulation)*numel(superficial_bias)*numel(noiselevel.thermal);
+cols=4+8;
+
+sz = [reps,cols];
+var_types = repmat({'double'},1,cols);
+var_names = {'Physio_Noise','Thermal_Noise','Superficial_Bias','Attention_Modulation','Zscore_TaskD','SVM_TaskD','LDC_TaskD','Mean_TaskD_TaskND','Mean_ROI_TaskD_TaskND','Deming_TaskD_TaskND','Real_BOLD_TaskD','Measured_BOLD_TaskD'};
+res_table = table('Size',sz,'VariableTypes',var_types,'VariableNames',var_names);
+var_table = res_table;
+med_table = res_table;
+p25_table = res_table;
+p75_table = res_table;
+
+cur_row=1;
+for noiseind = 1:numel(noiselevel.physio)
+    for thermalind = 1:numel(noiselevel.thermal)
+        for biasind = 1:numel(superficial_bias)
+            for attind = 1:numel(attentional_modulation)
+                ind = find((res(:,1)==noiselevel.physio(noiseind) & res(:,2)==noiselevel.thermal(thermalind) & res(:,3)==superficial_bias(biasind) & res(:,4)==attentional_modulation(attind)));
+                res_table(cur_row,:)=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanmean(res(ind,5:end)))];
+                var_table(cur_row,:)=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanstd(res(ind,5:end),0,1))];
+                med_table(cur_row,:)=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanmedian(res(ind,5:end),1))];
+                p25_table(cur_row,:)=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(prctile(res(ind,5:end),25))];
+                p75_table(cur_row,:)=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(prctile(res(ind,5:end),75))];
+                cur_row = cur_row+1;
+            end
+        end
+    end
+end
+
 
 %Pre-define interested results+variance table
 int_res = res_table(1:3,:);

@@ -28,7 +28,6 @@ voxelsignal = @ (firingrate, frequency, attention) ...
     firingrate.face .* frequency.face_cells .* attention.face + ...
     firingrate.house .* frequency.house_cells .* attention.house;
 
-
 % based on this we can simulate the response of an ROI to our task
 nvoxel = 500;
 %number of iterations to try for each conditions
@@ -42,8 +41,6 @@ GLM_var.blocks = 10; %no of blocks for each condition
 GLM_var.blockdur = 6; %block dur in terms of TR
 GLM_var.restdur = 1; %rest dur between blocks in terms of TR
 
-
-
 % two noise sources at voxel level
 % Physiological noise that scales with laminar bias
 noiselevel.physio = [4];
@@ -55,17 +52,6 @@ attentional_modulation = [2,3];
 % strength of superficial bias
 superficial_bias = [1, 1.5, 2];
 
-%Declaring Results and Variance Table 
-reps=numel(noiselevel.physio)*numel(attentional_modulation)*numel(superficial_bias)*numel(noiselevel.thermal);
-cols=4+8;
-sz = [reps,cols];
-var_types = repmat({'double'},1,cols);
-var_names = {'Physio_Noise','Thermal_Noise','Superficial_Bias','Attention_Modulation','Zscore_TaskD','SVM_TaskD','LDC_TaskD','Mean_TaskD_TaskND','Mean_ROI_TaskD_TaskND','Deming_TaskD_TaskND','Real_BOLD_TaskD','Measured_BOLD_TaskD'};
-
-res_table = table('Size',sz,'VariableTypes',var_types,'VariableNames',var_names);
-var_table = table('Size',sz,'VariableTypes',var_types,'VariableNames',var_names);
-
-
 % Make directory for output of scatterplots
 if ~exist('sim_scatter', 'dir')
     mkdir('sim_scatter')
@@ -74,8 +60,7 @@ end
 rng('default')
 
 %loop over all variables that we are interested in and call the model function
-cur_row=1;
-res_table = {}; var_table = {}; med_table = {}; p25_table = {}; p75_table = {};
+all_res = cell(iter,1);
 %pflag = 1; for iterind=1:iter  
 pflag = 1; parfor iterind=1:iter     
     glm = create_glm(GLM_var);
@@ -84,25 +69,19 @@ pflag = 1; parfor iterind=1:iter
             for biasind = 1:numel(superficial_bias)
                 for attind = 1:numel(attentional_modulation)
 
-                    iter_tnoise = noiselevel.thermal(thermalind);
-                    iter_pnoise = noiselevel.physio(noiseind);
-                    iter_bias = superficial_bias(biasind);
-                    iter_att = attentional_modulation(attind);
+                    tnoise = noiselevel.thermal(thermalind);
+                    pnoise = noiselevel.physio(noiseind);
+                    cur_bias = superficial_bias(biasind);
+                    cur_att = attentional_modulation(attind);
                     
-                    cur_res = attention_simulation_iteration(iterind,nvoxel,GLM_var,voxelsignal,iter_tnoise,iter_pnoise,iter_bias,iter_att,glm,pflag);
-                    
-                    res_table{iterind}=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanmean(cur_res,1))];
-                    var_table{iterind}=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanstd(cur_res,0,1))];
-                    med_table{iterind}=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(nanmedian(cur_res,1))];
-                    p25_table{iterind}=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(prctile(cur_res,25))];
-                    p75_table{iterind}=[{noiselevel.physio(noiseind),noiselevel.thermal(thermalind),superficial_bias(biasind),attentional_modulation(attind)},num2cell(prctile(cur_res,75))];
+                    cur_est = attention_simulation_iteration(iterind,nvoxel,GLM_var,voxelsignal,tnoise,pnoise,cur_bias,cur_att,glm,pflag);
+                    all_res{iterind}(end+1,:) = [pnoise,tnoise,cur_bias,cur_att,cur_est];
                 end
             end
         end
     end
 end
-%save('att_sim_results_same_pref.mat','res_table','var_table','med_table','p25_table','p75_table');
-save('att_sim_results_same_pref2.mat','res_table','var_table','med_table','p25_table','p75_table');
+save('att_sim_results_same_pref.mat','all_res');
 
 end
 
