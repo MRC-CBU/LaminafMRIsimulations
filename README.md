@@ -2,8 +2,7 @@
 Based on PhD work of Huang Pei (HP)
 
 
-To-do:
-
+### To-do:
 Modify plot functions to utilize updated variable names
 
 Check that plot functions still work with modified code
