@@ -20,7 +20,7 @@ rng('default')
 % number of voxels in the ROI
 n_voxels = 500;
 %number of iterations to try for each conditions
-iter = 10;
+iter = 10000;
 
 %Reduce the n_voxels or iter to reduce computational time
 
@@ -56,8 +56,8 @@ end
 all_res = cell(iter,1);
 
 % if no parallel computing available, use: 
-for iterind=1:iter  
-%parfor iterind=1:iter     
+% for iterind=1:iter  
+parfor iterind=1:iter     
     glm = create_glm(GLM_var);
     for noiseind = 1:numel(physio_sigma_list)
         for thermalind = 1:numel(thermal_sigma_list)
