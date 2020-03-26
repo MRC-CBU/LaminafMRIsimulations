@@ -10,12 +10,8 @@
 
 
 function attention_simulation
-
 % Add SPM to path (needed for the hrf function)
 % addpath /imaging/local/software/spm_cbu_svn/releases/spm12_latest/
-
-
-rng('default')
 
 % number of voxels in the ROI
 n_voxels = 500;
@@ -42,7 +38,7 @@ attention_list = [2,3];
 superficial_bias_list = [1, 1.5, 2];
 
 % pflag = 1 generates scatterplot, otherwise no scatterplot.
-pflag = 1; 
+pflag = 0; 
 
 
 
@@ -57,7 +53,10 @@ all_res = cell(iter,1);
 
 % if no parallel computing available, use: 
 % for iterind=1:iter  
-parfor iterind=1:iter     
+parfor iterind=1:iter   
+    % Declaring random seed so that results are reproducible
+    % Seed needs to be declared inside parfor loop otherwise matlab will seed individual workers randomly
+    rng(iterind)
     glm = create_glm(GLM_var);
     for noiseind = 1:numel(physio_sigma_list)
         for thermalind = 1:numel(thermal_sigma_list)
@@ -76,7 +75,7 @@ parfor iterind=1:iter
         end
     end
 end
-save('att_sim_results_same_pref.mat','all_res');
+save('att_sim_results.mat','all_res');
 
 end
 
@@ -151,8 +150,10 @@ function estimate = attention_simulation_iteration(count,n_voxels,GLM_var,therma
     
     % let's suppose this example ROI has more face cells than house cells (let's call it FFA)
     % Calculating this here so that each iteration can have different frequencies
+    % For Section 4.4 results, replace "n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));" with "n_neurons.face = abs(normrnd(0,1,[1, n_voxels]));"
     n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));
     n_neurons.house = abs(normrnd(0,1,[1, n_voxels]));
+    
     
     %======================================================================
     % Task with distractor - TaskD+ (dplus)
@@ -294,8 +295,8 @@ function estimate = attention_simulation_iteration(count,n_voxels,GLM_var,therma
     dminus.house_response = calc_voxel_response(firing_rate, n_neurons, attention);
     
     dminus.raw_response = [dminus.face_response', dminus.house_response']*glm.final_design{2};
-    dminus.thermal_noise = normrnd(0,2,size(dminus.raw_response))*thermal_sigma;
-    dminus.physio_noise = normrnd(0,2,size(dminus.raw_response))*physio_sigma;
+    dminus.thermal_noise = normrnd(0,1,size(dminus.raw_response))*thermal_sigma;
+    dminus.physio_noise = normrnd(0,1,size(dminus.raw_response))*physio_sigma;
     dminus.measured_response = dminus.thermal_noise+superficial_bias*(dminus.raw_response+dminus.physio_noise);   
     
     dminus.measured_trend = dminus.measured_response/dt_design;
@@ -329,7 +330,7 @@ function estimate = attention_simulation_iteration(count,n_voxels,GLM_var,therma
     estimate = [dplus.zscore, dplus.SVM, dplus.LDC, dplus_dminus_ratio_est, dplus_dminus_ROI_ratio_est, deming_dplus_dminus_est, mean(dplus.real_bold_response), mean(dplus.contrast_estimates)];
     
     %Generate deming plots for comparison with real data
-    fname = sprintf('sim_scatter/dplus_dminus_physio_sigma_%g_thermal_sigma_%g_salient_%g_bias_%g_att_%g.png',physio_sigma,thermal_sigma,1,superficial_bias,attention_modulation);
+    fname = sprintf('sim_scatter/dplus_dminus_physio_sigma_%g_thermal_sigma_%g_bias_%g_att_%g.png',physio_sigma,thermal_sigma,superficial_bias,attention_modulation);
     if count==1 && pflag
         figure
         scatter(dminus.contrast_estimates,dplus.contrast_estimates)
