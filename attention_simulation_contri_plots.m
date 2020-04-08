@@ -16,68 +16,76 @@ cmap = [251,180,174;
 cmap = cmap/255;
 
 res = load(filename); 
-res = cat(1,res.all_res{:});
+res = res.results;
 
-
-sz = [3,12];
-var_types = repmat({'double'},1,12);
-var_names = {'Physio_Noise','Thermal_Noise','Superficial_Bias','attentional_modulation','Zscore_TaskD','SVM_TaskD','LDC_TaskD','Mean_TaskD_TaskND','Mean_ROI_TaskD_TaskND','Deming_TaskD_TaskND','Real_BOLD_TaskD','Measured_BOLD_TaskD'};
-res_table = table('Size',sz,'VariableTypes',var_types,'VariableNames',var_names);
-var_table = res_table;
-med_table = res_table;
-p25_table = res_table;
-p75_table = res_table;
-
-
-%Extract the 3 rows
-for i = 1:3
-    ind = find((res(:,1)==physio_sigma_list(i) & res(:,2)==thermal_sigma_list(i) & res(:,3)==superficial_bias(i) & res(:,4)==attentional_modulation(i)));
-    res_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanmean(res(ind,5:end)))];
-    var_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanstd(res(ind,5:end),0,1))];
-    med_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanmedian(res(ind,5:end),1))];
-    p25_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(prctile(res(ind,5:end),25))];
-    p75_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(prctile(res(ind,5:end),75))];
-end
-
-
-%Combine the data into a results and error matrix
-res_mat=[res_table.attentional_modulation, res_table.Deming_TaskD_TaskND, res_table.Mean_TaskD_TaskND, res_table.Mean_ROI_TaskD_TaskND, res_table.Zscore_TaskD, res_table.SVM_TaskD, res_table.LDC_TaskD]';
-var_mat=[zeros(3,1), var_table.Deming_TaskD_TaskND, var_table.Mean_TaskD_TaskND, var_table.Mean_ROI_TaskD_TaskND, var_table.Zscore_TaskD, var_table.SVM_TaskD, var_table.LDC_TaskD]';
-p25_mat=[res_table.attentional_modulation, p25_table.Deming_TaskD_TaskND, p25_table.Mean_TaskD_TaskND, p25_table.Mean_ROI_TaskD_TaskND, p25_table.Zscore_TaskD, p25_table.SVM_TaskD, p25_table.LDC_TaskD]';
-p75_mat=[res_table.attentional_modulation, p75_table.Deming_TaskD_TaskND, p75_table.Mean_TaskD_TaskND, p75_table.Mean_ROI_TaskD_TaskND,p75_table.Zscore_TaskD, p75_table.SVM_TaskD, p75_table.LDC_TaskD]';
-
-mean_res = mean(res_mat,2);
-var_mat_new = mean((p75_mat - p25_mat)/2,2)./mean_res;
+%Find the indices for the 3 rows
+match = NaN(3,size(res(1).params,2));
 for i=1:3
-    res_mat(:,i) = res_mat(:,i)./mean_res;
+    match(i,:) = [res(1).params.physio_sigma]==physio_sigma_list(i) & [res(1).params.thermal_sigma]==thermal_sigma_list(i) & [res(1).params.superficial_bias]==superficial_bias(i) & [res(1).params.attentional_modulation]==attentional_modulation(i);
 end
-contri_vects =[1 0 -1; 0.5 -1 0.5];
-contri_mat = contri_vects*res_mat';
-contri_mat = contri_mat';
 
+var_names=fieldnames(res(1).estimates);
+res_table = struct();
+for iter=1:size(res,2)
+    estimates = res(iter).estimates;
+    for i=1:3
+        cur_est = estimates(match(i,:)==1);
+        for j=1:size(var_names,1)
+            if size([estimates.(var_names{j})],1)==1 %skipping real bold response and measured bold response because they are nvox*iter matrices
+                res_table.(var_names{j})(iter,i) = cur_est.(var_names{j});
+            end
+        end
+    end
+end
 
+%Adding in Ground Truth
+res_table.ground_truth(1,:) = attentional_modulation;
+
+%Order res_table in plotting order
+order = {'ground_truth','deming_est','raw_ratio_est','ROI_ratio_est','zscore','SVM','LDC'};
+res_table = orderfields(res_table,order);
+var_names=fieldnames(res_table);
+
+%demean the data
+for i=1:size(var_names,1)
+    for j=1:size(res_table.(var_names{i}),1)
+        res_table.(var_names{i})(j,:) = res_table.(var_names{i})(j,:)/mean(res_table.(var_names{i})(j,:));
+    end
+end
+
+contri_vects =[1 0 -1; 0.5 -1 0.5]';
+mean_contri=NaN(size(var_names,2),2);
+p25_contri=mean_contri;
+p75_contri=mean_contri;
+
+for i=1:size(var_names,1)
+    contri=res_table.(var_names{i}) * contri_vects;
+    mean_contri(i,:)=mean(contri,1);
+    p25_contri(i,:)=prctile(contri,25,1);
+    p75_contri(i,:)=prctile(contri,75,1);
+end
 
 %Plot the data
 figure
-att_plot=bar(contri_mat);
+att_plot=bar(mean_contri);
 hold on
 for b=1:2
     att_plot(b).FaceColor = cmap(b,:);
 end
 
 %Add error bars
-ngroups = size(contri_mat, 1);
-nbars = size(contri_mat, 2);
+ngroups = size(mean_contri, 1);
+nbars = size(mean_contri, 2);
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, contri_mat(:,i), var_mat_new, 'k.');
+    errorbar(x, mean_contri(:,i), mean_contri(:,i)-p25_contri(:,i),p75_contri(:,i)-mean_contri(:,i), 'k.');
 end
 
 %Tidying up the plot and adding labels
 set(gca, 'XTickLabel', {'Ground Truth','Deming Regression','Ratio of individual voxels', 'Ratio of entire ROI', 'Z-scoring', 'SVM classification', 'LDC'});
 set(gca,'XTickLabelRotation',20);
-ylim([-0.2 1]);
+ylim([-0.2 1.2]);
 ylabel('Laminar Contributions')
 x0=10;
 y0=10;

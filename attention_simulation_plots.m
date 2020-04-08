@@ -15,29 +15,27 @@ cmap = [8 81 156;
     107 174 214;
     189 215 231];
 cmap = cmap/255;
-
+    
 res = load(filename); 
-res = cat(1,res.all_res{:});
-
-
-sz = [3,12];
-var_types = repmat({'double'},1,12);
-var_names = {'Physio_Noise','Thermal_Noise','Superficial_Bias','attentional_modulation','Zscore_TaskD','SVM_TaskD','LDC_TaskD','Mean_TaskD_TaskND','Mean_ROI_TaskD_TaskND','Deming_TaskD_TaskND','Real_BOLD_TaskD','Measured_BOLD_TaskD'};
-res_table = table('Size',sz,'VariableTypes',var_types,'VariableNames',var_names);
-var_table = res_table;
-med_table = res_table;
-p25_table = res_table;
-p75_table = res_table;
-
+res = res.results;
 
 %Extract the 3 rows
+params = [res.params];
+estimates = [res.estimates];
+var_names=fieldnames(estimates);
 for i = 1:3
-    ind = find((res(:,1)==physio_sigma_list(i) & res(:,2)==thermal_sigma_list(i) & res(:,3)==superficial_bias(i) & res(:,4)==attentional_modulation(i)));
-    res_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanmean(res(ind,5:end)))];
-    var_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanstd(res(ind,5:end),0,1))];
-    med_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(nanmedian(res(ind,5:end),1))];
-    p25_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(prctile(res(ind,5:end),25))];
-    p75_table(i,:)=[{physio_sigma_list(i),thermal_sigma_list(i),superficial_bias(i),attentional_modulation(i)},num2cell(prctile(res(ind,5:end),75))];
+    match = [params.physio_sigma]==physio_sigma_list(i) & [params.thermal_sigma]==thermal_sigma_list(i) & [params.superficial_bias]==superficial_bias(i) & [params.attentional_modulation]==attentional_modulation(i);
+    
+    cur_estimates = estimates(match==1);
+    
+    for j=1:size(var_names,1)
+        if size([cur_estimates.(var_names{j})],1)==1 %skipping real bold response and measured bold response because they are nvox*iter matrices
+            res_table.(var_names{j})(i)=mean([cur_estimates.(var_names{j})]);
+            var_table.(var_names{j})(i)=std([cur_estimates.(var_names{j})]);
+            p25_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],25);
+            p75_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],75);
+        end
+    end
 end
    
 % Split into multiple plots:
@@ -47,10 +45,10 @@ end
 % 4. Z-score
 
 %Combine the data into a results and error matrix
-res_mat=[res_table.attentional_modulation, res_table.Deming_TaskD_TaskND, res_table.Mean_TaskD_TaskND, res_table.Mean_ROI_TaskD_TaskND]';
-var_mat=[zeros(3,1), var_table.Deming_TaskD_TaskND, var_table.Mean_TaskD_TaskND, var_table.Mean_ROI_TaskD_TaskND]';
-p25_mat=[res_table.attentional_modulation, p25_table.Deming_TaskD_TaskND, p25_table.Mean_TaskD_TaskND, p25_table.Mean_ROI_TaskD_TaskND]';
-p75_mat=[res_table.attentional_modulation, p75_table.Deming_TaskD_TaskND, p75_table.Mean_TaskD_TaskND, p75_table.Mean_ROI_TaskD_TaskND]';
+res_mat=[attentional_modulation; res_table.deming_est; res_table.raw_ratio_est; res_table.ROI_ratio_est];
+var_mat=[zeros(1,3); var_table.deming_est; var_table.raw_ratio_est; var_table.ROI_ratio_est];
+p25_mat=[attentional_modulation; p25_table.deming_est; p25_table.raw_ratio_est; p25_table.ROI_ratio_est];
+p75_mat=[attentional_modulation; p75_table.deming_est; p75_table.raw_ratio_est; p75_table.ROI_ratio_est];
 
 %Plot the data
 figure
@@ -89,7 +87,7 @@ hold off
 
 %Plot the data
 figure
-att_plot=bar(res_table.Zscore_TaskD);
+att_plot=bar(res_table.zscore);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -103,7 +101,7 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.Zscore_TaskD(:,i), res_table.Zscore_TaskD(:,i)-p25_table.Zscore_TaskD(:,i),p75_table.Zscore_TaskD(:,i)-res_table.Zscore_TaskD(:,i), 'k.');
+    errorbar(x, res_table.zscore(i,:), res_table.zscore(i,:)-p25_table.zscore(i,:),p75_table.zscore(i,:)-res_table.zscore(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
@@ -126,7 +124,7 @@ hold off
 
 %Plot the data
 figure
-att_plot=bar(res_table.SVM_TaskD);
+att_plot=bar(res_table.SVM);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -140,14 +138,14 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.SVM_TaskD(:,i), res_table.SVM_TaskD(:,i)-p25_table.SVM_TaskD(:,i),p75_table.SVM_TaskD(:,i)-res_table.SVM_TaskD(:,i), 'k.');
+    errorbar(x, res_table.SVM(i,:), res_table.SVM(i,:)-p25_table.SVM(i,:),p75_table.SVM(i,:)-res_table.SVM(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
 xticks([2])
 set(gca, 'XTickLabel', {'SVM Classification'});
 set(gca,'XTickLabelRotation',20);
-ylim([60 100]);
+ylim([80 100]);
 ylabel('Classification Accuracy (%)')
 x0=10;
 y0=10;
@@ -163,7 +161,7 @@ hold off
 
 %Plot the data
 figure
-att_plot=bar(res_table.LDC_TaskD);
+att_plot=bar(res_table.LDC);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -177,7 +175,7 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.LDC_TaskD(:,i), res_table.LDC_TaskD(:,i)-p25_table.LDC_TaskD(:,i),p75_table.LDC_TaskD(:,i)-res_table.LDC_TaskD(:,i), 'k.');
+    errorbar(x, res_table.LDC(i,:), res_table.LDC(i,:)-p25_table.LDC(i,:),p75_table.LDC(i,:)-res_table.LDC(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
