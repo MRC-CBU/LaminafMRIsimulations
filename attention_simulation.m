@@ -1,242 +1,152 @@
-% Simulate attention and layer effects for 7T project. 
+% Simulate attention and layer effects for Deming regression paper. 
 % Objectives:
-% 1. Simulate effects of attention in voxels for two conditions TaskD+ and TaskD-
-% 2. Generate simulated fMRI data with superficial bias, thermal and
-% physiological noise (measured_response) 
-% 3. Apply sinosodial, linear and mean detrending to the data
-% 4. Generate scatterplots for comparison with real data to obtain
-% estimates of noise for simulation
+% 1. Simulate effects of attention in voxels for two conditions TaskD+ (dplus) and TaskD- (dminus)
+% 2. Generate simulated fMRI data with superficial bias, thermal and physiological noise (measured_response) 
+% 3. Apply sinusoidal, linear and mean detrending to the data
+% 4. Generate scatterplots for comparison with real data to obtain estimates of noise for simulation
 % 5. Demonstrate that our multiplicative gain factor mimics real data   
-% 6. Utilize our potential metrics to recover the underlying attention
-% modulation in response to different parameter levels with 500 iterations to generate a stable
-% estimate of mean and variance
-% 7. Generate a tabulated list of data to be queried by a seperate function
-% and generate laminar profiles of different attention modulations. 
+% 6. Utilize various metrics to recover the underlying attention modulation in response to different parameter levels
+% 7. Generate a tabulated list of data to be queried by a seperate function and generate laminar profiles of different attention modulations. 
 
-function attention_simulation
 
-%addpath /imaging/local/software/spm_cbu_svn/releases/spm12_latest/
+function attention_simulation(iter, pflag)
 
-% The response of a voxel depends on two populations of cells: face cells and house
-% cells.
-% Each cell population can be active or not (firingrate - 1 or 0)
-% Each voxel varies in how many cells there are of a given type (frequency, ie how much they contribute to the voxel -
-% equivalently you can think of this as response gain in equally-sized populations)
-% Each voxel varies in how much it is modulated by the task (attention)
-% noise is added in a later step
-voxelsignal = @ (firingrate, frequency, attention) ...
-    firingrate.face .* frequency.face_cells .* attention.face + ...
-    firingrate.house .* frequency.house_cells .* attention.house;
+% Add SPM to path (needed for the hrf function)
+if isempty(which('spm_hrf'))
+    error('ensure SPM12 is on the Matlab path');
+end
 
-% based on this we can simulate the response of an ROI to our task
-nvoxel = 500;
 %number of iterations to try for each conditions
-iter = 10000;
+if ~exist('iter','var') || isempty(iter)
+    iter = 10000;
+end
 
-%Reduce the nvoxel or iter to reduce computational time
+% pflag = true generates scatterplot, otherwise no scatterplot.
+if ~exist('pflag','var') || isempty(pflag)
+    pflag = true;
+end
+
+%Reduce the n_voxels or iter to reduce computational time
+% number of voxels in the ROI
+n_voxels = 500;
+
 
 %Declare GLM for this study
-GLM_var.TR = 2.5; %TR
-GLM_var.blocks = 10; %no of blocks for each condition
-GLM_var.blockdur = 6; %block dur in terms of TR
-GLM_var.restdur = 1; %rest dur between blocks in terms of TR
+glm_var.TR = 2.5; %TR
+glm_var.blocks = 10; %no of blocks of house/face for each subrun
+glm_var.blockdur = 6; %block dur in terms of TR
+glm_var.restdur = 1; %rest dur between blocks in terms of TR
+glm_var.n_subruns = 4; %no of subruns per attention condition (TaskD+/TaskD-)
 
-% two noise sources at voxel level
+% two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
-noiselevel.physio = [4];
+physio_sigma_list = [8];
 % Thermal noise that is consistent across layers
-noiselevel.thermal = [6];
+thermal_sigma_list = [12];
 
 % strength of modulation (attentional)
-attentional_modulation = [2,3];
+attention_list = [2,3];
 % strength of superficial bias
-superficial_bias = [1, 1.5, 2];
+superficial_bias_list = [1, 1.5, 2];
+
 
 % Make directory for output of scatterplots
-if ~exist('sim_scatter', 'dir')
+if ~exist('sim_scatter', 'dir') && pflag
     mkdir('sim_scatter')
 end
 
-rng('default')
+results(iter) = struct();
 
-%loop over all variables that we are interested in and call the model function
-all_res = cell(iter,1);
-%pflag = 1; for iterind=1:iter  
-pflag = 1; parfor iterind=1:iter     
-    glm = create_glm(GLM_var);
-    for noiseind = 1:numel(noiselevel.physio)
-        for thermalind = 1:numel(noiselevel.thermal)
-            for biasind = 1:numel(superficial_bias)
-                for attind = 1:numel(attentional_modulation)
+% custom seed but preserve deterministic behaviour over iterations
+seed = 123456;
 
-                    tnoise = noiselevel.thermal(thermalind);
-                    pnoise = noiselevel.physio(noiseind);
-                    cur_bias = superficial_bias(biasind);
-                    cur_att = attentional_modulation(attind);
-                    
-                    cur_est = attention_simulation_iteration(iterind,nvoxel,GLM_var,voxelsignal,tnoise,pnoise,cur_bias,cur_att,glm,pflag);
-                    all_res{iterind}(end+1,:) = [pnoise,tnoise,cur_bias,cur_att,cur_est];
+% if no parallel computing available, use: 
+% for iterind=1:iter
+parfor iterind=1:iter
+    % Declaring random seed so that results are reproducible
+    % Seed needs to be declared inside parfor loop otherwise matlab will seed individual workers randomly
+    count = 1;
+    rng(iterind * seed)
+    glm = create_glm(glm_var);
+    for physio_sigma = physio_sigma_list
+        for thermal_sigma = thermal_sigma_list
+            for superficial_bias = superficial_bias_list
+                for attentional_modulation = attention_list
+                    params = struct('physio_sigma',physio_sigma,'thermal_sigma',thermal_sigma,'superficial_bias',superficial_bias,'attentional_modulation',attentional_modulation);
+                    [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_var,params,glm);
+                    if iterind==1 && pflag            % only plot first iteration
+                        scatter_plot(params,plot_vars.dplus,plot_vars.dminus,plot_vars.deming);
+                    end
+                    results(iterind).params(count) = params;
+                    results(iterind).estimates(count) = estimates; 
+                    count = count+1;
                 end
             end
         end
     end
 end
-save('att_sim_results_same_pref.mat','all_res');
+save('att_sim_results.mat','results');
 
 end
 
-function glm = create_glm(GLM_var);
-    
-    final_design=cell(2,1);
-    glm.total_length = 2*GLM_var.restdur+2*GLM_var.blocks*(GLM_var.blockdur+GLM_var.restdur);
-    
-    for j=1:2 %2 design matrices for TaskD+ and TaskD- 
-        % Construct GLM matrix 
-        for k = 1:4     % 4 runs per condition
-            %randomize order of blocks within subruns (1 is faces, 2 is houses)
-            design = zeros(2,glm.total_length);
-            SVM_design = zeros(2*GLM_var.blocks,glm.total_length);
-            subrun{k} = [repmat(1,1,GLM_var.blocks),repmat(2,1,GLM_var.blocks)];
-            subrun{k} = subrun{k}(randperm(length(subrun{k}))); 
-            %Structure is long_rest-subrun
-            %Define start times for each subrun and input into design matrix
-            sr1_start = GLM_var.restdur;
-
-            cur_timepoint = sr1_start;
-            for i=1:length(subrun{k})
-                design(subrun{k}(i),cur_timepoint:cur_timepoint+GLM_var.blockdur-1)=1;
-                cur_timepoint = cur_timepoint+GLM_var.blockdur+GLM_var.restdur;
-            end
-            run_mat{k}=design;
-            
-            
-            %Generate individual columns for SVM classification
-            cur_timepoint = sr1_start;
-            c1_count = 1;
-            c2_count = 1;
-            for i=1:length(subrun{k})
-                if subrun{k}(i)==1
-                    SVM_design(c1_count,cur_timepoint:cur_timepoint+GLM_var.blockdur-1)=1;
-                    c1_count = c1_count+1;
-                else
-                    SVM_design(10+c2_count,cur_timepoint:cur_timepoint+GLM_var.blockdur-1)=1;
-                    c2_count = c2_count+1;
-                    
-                end
-                cur_timepoint = cur_timepoint+GLM_var.blockdur+GLM_var.restdur;
-            end
-            SVM_subrun{k} = SVM_design;
-        end
-        design_mat = horzcat(run_mat{1:4});
-        %convolve with HRF to generate the design matrix
-        glm.hrf_distri = spm_hrf(GLM_var.TR)';
-        conv_design = conv2(design_mat,glm.hrf_distri,'same');
-        
-        glm.final_design{j} = conv_design;
-        
-        SVM_design = blkdiag(SVM_subrun{1:4});
-        conv_SVM = conv2(SVM_design,glm.hrf_distri,'same');
-        
-        glm.SVM_design_mat{j} = conv_SVM;
-    end
-end
-
-
-function cur_est = attention_simulation_iteration(count,nvoxel,GLM_var,voxelsignal,tnoise,pnoise,cur_bias,cur_att,glm,pflag)
+function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_var,params,glm)
     
     % let's suppose this example ROI has more face cells than house cells (let's call it FFA)
     % Calculating this here so that each iteration can have different frequencies
-    frequency.face_cells = abs(normrnd(0,2,[1, nvoxel]));
-    frequency.house_cells = abs(normrnd(0,1,[1, nvoxel]));
+    % For Section 4.4 results, replace "n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));" with "n_neurons.face = abs(normrnd(0,1,[1, n_voxels]));"
+    n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));
+    n_neurons.house = abs(normrnd(0,1,[1, n_voxels]));
+    
     
     %======================================================================
-    % Task with distractor - TaskD+
+    % Task with distractor - TaskD+ (dplus)
     %======================================================================
     
     % face stimulus, attention task, with distractor
-    attention.face = cur_att;
+    attention.face = params.attentional_modulation;
     attention.house = 1;
-    firingrate.face = 1;
-    firingrate.house = 1;  
-    face_task_dplus_response = voxelsignal(firingrate, frequency, attention);
+    firing_rate.face = 1;
+    firing_rate.house = 1;  
+    dplus.face_response = calc_voxel_response(firing_rate, n_neurons, attention);
 
     % house stimulus, attention task, with distractor
     attention.face = 1;
-    attention.house = cur_att;
-    firingrate.face = 1;
-    firingrate.house = 1;
-    house_task_dplus_response = voxelsignal(firingrate, frequency, attention);
+    attention.house = params.attentional_modulation;
+    firing_rate.face = 1;
+    firing_rate.house = 1;
+    dplus.house_response = calc_voxel_response(firing_rate, n_neurons, attention);
     
-    raw_response = [face_task_dplus_response', house_task_dplus_response']*glm.final_design{1};
-    thermal_noise = normrnd(0,2,size(raw_response))*tnoise;
-    physio_noise = normrnd(0,2,size(raw_response))*pnoise;
-    measured_response = thermal_noise+cur_bias*(raw_response+physio_noise);
+    % construct timecourses by scaling design matrix according to the face and house responses
+    dplus.measured_response_array = calc_measured_response(dplus,glm.design(1),params);
     
-    % Linear, first order sinosodial and mean detrending
-    nvols = size(measured_response,2);
-%     linear_trend=[1:nvols];
-%     sin_trend=sin((linear_trend)*2*pi/(nvols-1));
-%     cos_trend=cos((linear_trend)*2*pi/(nvols-1));
-%     mean_trend = ones(1,nvols);
-%     
-%     dt_design = [linear_trend;sin_trend;cos_trend;mean_trend];
-%     
-%     measured_trend = measured_response/dt_design;
-%     measured_est = measured_trend*dt_design;
-%     detrended_response = measured_response - measured_est;
-%     
-%     design_trend = final_design{1}/dt_design;
-%     design_est = design_trend*dt_design;
-%     detrended_design = final_design{1} - design_est;
-%     
-%     SVM_design_trend = SVM_design_mat{1}/dt_design;
-%     SVM_design_est = SVM_design_trend*dt_design;
-%     detrended_SVM = SVM_design_mat{1} - SVM_design_est;
-%     
-%     %Method 1: Z-scoring
-%     zbeta_estimates = zscore(detrended_response')'/detrended_design;
-%     zscore_taskD = mean(zbeta_estimates(:,1)-zbeta_estimates(:,2));
-%     
-%     %Fitting the measured response to the GLM for the other methods
-%     beta_estimates = detrended_response/detrended_design;
-%     contrast_estimates = beta_estimates(:,1)-beta_estimates(:,2);
-%     
-%     % Split data into sub runs for SVM and LDC cross-validation
-%     for i=1:4
-%         subrun_data{i}=detrended_response(:,(i-1)*glm.total_length+1:i*glm.total_length);
-%         SVM_mat{i}=detrended_SVM((i-1)*20+1:i*20,(i-1)*glm.total_length+1:i*glm.total_length);
-%         LDC_mat{i}=detrended_design(:,(i-1)*glm.total_length+1:i*glm.total_length);
-%     end    
-
+    
+    %detrending data
+    dplus.detrended_response_array = detrend(dplus.measured_response_array);
+    dplus.detrended_design_array = detrend(glm.design(1).design_mat);
+    dplus.detrended_SVM_array = detrend(glm.design(1).SVM_mat);
+    
+    dplus.detrended_response = horzcat(dplus.detrended_response_array{:});
+    dplus.detrended_design = horzcat(dplus.detrended_design_array{:});
+    
     %Method 1: Z-scoring
-    zbeta_estimates = zscore(measured_response')'/glm.final_design{1};
-    zscore_taskD = mean(zbeta_estimates(:,1)-zbeta_estimates(:,2));
+    dplus.zbeta_estimates = zscore(dplus.detrended_response')'/dplus.detrended_design;
+    estimates.zscore = mean(dplus.zbeta_estimates(:,1)-dplus.zbeta_estimates(:,2));
     
-    %Fitting the measured response to the GLM for the other methods
-    beta_estimates = measured_response/glm.final_design{1};
-    contrast_estimates = beta_estimates(:,1)-beta_estimates(:,2);
-
-    for i=1:4
-        subrun_data{i}=measured_response(:,(i-1)*glm.total_length+1:i*glm.total_length);
-        SVM_mat{i}=glm.SVM_design_mat{1}((i-1)*20+1:i*20,(i-1)*glm.total_length+1:i*glm.total_length);
-        LDC_mat{i}=glm.final_design{1}(:,(i-1)*glm.total_length+1:i*glm.total_length);
-    end    
-
-    %Method 2: SVM classifier
+    %Method 2: SVM classifier for TaskD+
     correct_class = 0;
     for i=1:4
         train_ind = setdiff(1:4,i);
         test_ind = i;
-        train_design = blkdiag(SVM_mat{train_ind});
-        test_design = SVM_mat{test_ind};
+        train_design = blkdiag(dplus.detrended_SVM_array{train_ind});
+        test_design = dplus.detrended_SVM_array{test_ind};
         
-        train_data = horzcat(subrun_data{train_ind});
-        test_data = subrun_data{test_ind};
+        train_data = horzcat(dplus.detrended_response_array{train_ind});
+        test_data = dplus.detrended_response_array{test_ind};
         
         train_betas = train_data/train_design;
         test_betas = test_data/test_design;
         
-        test_labels = [repmat(0,1,GLM_var.blocks),repmat(1,1,GLM_var.blocks)];
+        test_labels = [repmat(0,1,glm_var.blocks),repmat(1,1,glm_var.blocks)]; 
         train_labels = [test_labels,test_labels,test_labels];
         svm_model = fitcsvm(train_betas',train_labels);
         predict_labels = predict(svm_model,test_betas');
@@ -246,120 +156,200 @@ function cur_est = attention_simulation_iteration(count,nvoxel,GLM_var,voxelsign
             end
         end
     end
-    SVM_acc = correct_class/8*GLM_var.blocks;
+    estimates.SVM = 100*correct_class/(2*glm_var.n_subruns*glm_var.blocks);
     
-    %Method 3: LDC
+    %Method 3: LDC for TaskD+
+    LDC_dist = nan(4,1);
     for i=1:4
         train_ind = setdiff(1:4,i);
         test_ind = i;
-        train_design = horzcat(LDC_mat{train_ind});
-        test_design = LDC_mat{test_ind};
-        conv_train_design = conv2(train_design,glm.hrf_distri,'same');
-        conv_test_design = conv2(test_design,glm.hrf_distri,'same');
-        train_data = horzcat(subrun_data{train_ind});
-        test_data = subrun_data{test_ind};
+        train_design = horzcat(dplus.detrended_design_array{train_ind});
+        test_design = dplus.detrended_design_array{test_ind};
+        train_data = horzcat(dplus.detrended_response_array{train_ind});
+        test_data = dplus.detrended_response_array{test_ind};
         
-        train_betas = train_data/conv_train_design;
+        train_betas = train_data/train_design;
         train_con = train_betas *[1;-1];
-        train_predict = train_betas*conv_train_design;
+        train_predict = train_betas*train_design;
         train_res = train_data - train_predict;
         train_cov = covdiag(train_res');
         train_cov = train_cov./size(train_cov,1);
         weights = train_con' * pinv(train_cov);
-        weights = weights/norm(weights);
         
-        test_betas = test_data/conv_test_design;
+        test_betas = test_data/test_design;
         test_con = test_betas * [1;-1];
         
         LDC_dist(i) = test_con'*weights';
     end
     
-    LDC_res = mean(LDC_dist);
+    estimates.LDC = mean(LDC_dist);
     
-    %Store contrast estimate for Methods 4,5 and 6
-    measured_bold_task_dplus = contrast_estimates;
     
-    %Store real contrast for reference
-    real_bold_task_dplus = face_task_dplus_response'-house_task_dplus_response';
+    %Fitting the measured response to the GLM for the other methods
+    dplus.beta_estimates = dplus.detrended_response/dplus.detrended_design;
+    dplus.contrast_estimates = dplus.beta_estimates(:,1)-dplus.beta_estimates(:,2);
+    
+    %Store BOLD responses for reference
+    estimates.dplus_real_bold_response = dplus.face_response'-dplus.house_response';
+    estimates.dplus_measured_bold_response = dplus.contrast_estimates;
     
 
     %======================================================================
-    % next, attention task without distractor - TaskD-
+    % next, attention task without distractor - TaskD- (dminus)
     %======================================================================
     
     % face stimulus, attention task, no distractor
-    attention.face = cur_att;
+    attention.face = params.attentional_modulation;
     attention.house = 1;
-    firingrate.face = 1;
-    firingrate.house = 0;
-    face_task_dminus_response = voxelsignal(firingrate, frequency, attention);
+    firing_rate.face = 1;
+    firing_rate.house = 0;
+    dminus.face_response = calc_voxel_response(firing_rate, n_neurons, attention);
 
     % house stimulus, attention task, no distractor
     attention.face = 1;
-    attention.house = cur_att;
-    firingrate.face = 0;
-    firingrate.house = 1;
-    house_task_dminus_response = voxelsignal(firingrate, frequency, attention);
+    attention.house = params.attentional_modulation;
+    firing_rate.face = 0;
+    firing_rate.house = 1;
+    dminus.house_response = calc_voxel_response(firing_rate, n_neurons, attention);
     
-    raw_response = [face_task_dminus_response', house_task_dminus_response']*glm.final_design{2};
-    thermal_noise = normrnd(0,2,size(raw_response))*tnoise;
-    physio_noise = normrnd(0,2,size(raw_response))*pnoise;
-    measured_response = thermal_noise+cur_bias*(raw_response+physio_noise);   
+    dminus.measured_response_array = calc_measured_response(dminus,glm.design(1),params);
     
-%     measured_trend = measured_response/dt_design;
-%     measured_est = measured_trend*dt_design;
-%     detrended_response = measured_response - measured_est;
-%     
-%     design_trend = final_design{2}/dt_design;
-%     design_est = design_trend*dt_design;
-%     detrended_design = final_design{2} - design_est;
-%     
-%     %Fitting the measured response to the GLM 
-%     beta_estimates = detrended_response/detrended_design;
-%     contrast_estimates = beta_estimates(:,1)-beta_estimates(:,2);
-
+    dminus.detrended_response_array = detrend(dminus.measured_response_array);
+    dminus.detrended_design_array = detrend(glm.design(1).design_mat);
+    
+    dminus.detrended_response = horzcat(dminus.detrended_response_array{:});
+    dminus.detrended_design = horzcat(dminus.detrended_design_array{:});
+    
+    
     %Fitting the measured response to the GLM 
-    beta_estimates = measured_response/glm.final_design{2};
-    contrast_estimates = beta_estimates(:,1)-beta_estimates(:,2);
-    
-    %Store contrast estimate for Methods 4,5 and 6
-    measured_bold_task_dminus = contrast_estimates;
+    dminus.beta_estimates = dminus.detrended_response/dminus.detrended_design;
+    dminus.contrast_estimates = dminus.beta_estimates(:,1)-dminus.beta_estimates(:,2);
     
     %======================================================================
     % Evaluating Methods 4,5 and 6
     %======================================================================
     
-    % Method 4: Estimating Attention Modulation with mean(TaskD/TaskND)
-    taskD_taskND_ratio = mean(measured_bold_task_dplus./measured_bold_task_dminus);
-    taskD_taskND_ratio_est =  1/(1-taskD_taskND_ratio);
+    % Method 4: Estimating Attention Modulation with mean(dplus/dminus)
+    raw_ratio = mean(dplus.contrast_estimates./dminus.contrast_estimates);
+    estimates.raw_ratio_est =  1/(1-raw_ratio);
     
-    % Method 5: Estimating Attention Modulation with mean(TaskD)/mean(TaskND)
-    taskD_taskND_ROI_ratio = mean(measured_bold_task_dplus)/mean(measured_bold_task_dminus);
-    taskD_taskND_ROI_ratio_est =  1/(1-taskD_taskND_ROI_ratio);
+    % Method 5: Estimating Attention Modulation with mean(dplus)/mean(dminus)
+    ROI_ratio = mean(dplus.contrast_estimates)/mean(dminus.contrast_estimates);
+    estimates.ROI_ratio_est =  1/(1-ROI_ratio);
    
-    % Method 6: Estimating Attention Modulation with TaskD/TaskND Deming Regression
-    slope_taskD_taskND = deming(measured_bold_task_dminus,measured_bold_task_dplus);
-    taskD_taskND = slope_taskD_taskND(2);
-    taskD_taskND_att_est = 1/(1-taskD_taskND);
+    % Method 6: Estimating Attention Modulation with dplus/dminus Deming Regression
+    deming_ratio = deming(dminus.contrast_estimates,dplus.contrast_estimates);
+    estimates.deming_est = 1/(1-deming_ratio(2));
     
-    cur_est = [zscore_taskD, SVM_acc,LDC_res,taskD_taskND_ratio_est,taskD_taskND_ROI_ratio_est, taskD_taskND_att_est,mean(real_bold_task_dplus),mean(measured_bold_task_dplus)];
     
+    % Assigning variables needed for plotting 
+    plot_vars=struct('dplus',dplus,'dminus',dminus,'deming',deming_ratio);
+
+    
+end
+
+function voxel_response = calc_voxel_response(firing_rate, n_neurons, attention)
+    % The response of a voxel depends on two populations of cells: face cells and house cells.
+    % Each cell population can be active or not (firing_rate - 1 or 0)
+    % Each voxel varies in how many neuron cells there are of a given type (n_neurons, ie how much they contribute to the voxel)
+    % Each voxel varies in how much it is modulated by the task (attention)
+    % noise is added in a later step
+    voxel_response = firing_rate.face .* n_neurons.face .* attention.face + firing_rate.house .* n_neurons.house .* attention.house;
+end
+
+function glm = create_glm(glm_var)
+    glm.subrun_length = 2*glm_var.restdur+2*glm_var.blocks*(glm_var.blockdur+glm_var.restdur); 
+    glm.hrf_distri = spm_hrf(glm_var.TR)';
+    for j=1:2 %2 design matrices for TaskD+ and TaskD-
+        % Construct GLM matrix 
+        subrun = cell(glm_var.n_subruns,1);
+        design_mat = cell(glm_var.n_subruns,1);
+        SVM_mat = cell(glm_var.n_subruns,1);
+        for k = 1:glm_var.n_subruns   
+            %randomize order of blocks within subruns (1 is faces, 2 is houses)
+            design = zeros(2,glm.subrun_length);
+            SVM_design = zeros(2*glm_var.blocks,glm.subrun_length);
+            subrun{k} = [repmat(1,1,glm_var.blocks),repmat(2,1,glm_var.blocks)];
+            subrun{k} = subrun{k}(randperm(length(subrun{k}))); 
+            %Structure is long_rest-subrun
+            %Define start times for each subrun and input into design matrix
+            sr1_start = glm_var.restdur;
+
+            cur_timepoint = sr1_start;
+            for i=1:length(subrun{k})
+                design(subrun{k}(i),cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
+                cur_timepoint = cur_timepoint+glm_var.blockdur+glm_var.restdur;
+            end
+            %convolve with HRF to generate the design matrix
+            design_mat{k}=conv2(design,glm.hrf_distri,'same');
+            
+            
+            %Generate individual columns for SVM classification
+            cur_timepoint = sr1_start;
+            c1_count = 1;
+            c2_count = 1;
+            for i=1:length(subrun{k})
+                if subrun{k}(i)==1
+                    SVM_design(c1_count,cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
+                    c1_count = c1_count+1;
+                else
+                    SVM_design(10+c2_count,cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
+                    c2_count = c2_count+1;
+                    
+                end
+                cur_timepoint = cur_timepoint+glm_var.blockdur+glm_var.restdur;
+            end
+            %convolve with HRF to generate the design matrix
+            SVM_mat{k} = conv2(SVM_design,glm.hrf_distri,'same');
+        end
+        
+        glm.design(j).design_mat = design_mat;
+        glm.design(j).SVM_mat = SVM_mat;
+    end
+end
+
+
+function measured_response = calc_measured_response(cond,design,params)
+    measured_response = cell(size(design.design_mat,1),1);
+    for i=1:size(design.design_mat,1)
+        raw_response = [cond.face_response', cond.house_response']*design.design_mat{i};
+        thermal_noise = normrnd(0,1,size(raw_response))*params.thermal_sigma;
+        physio_noise = normrnd(0,1,size(raw_response))*params.physio_sigma;
+        measured_response{i} = thermal_noise+params.superficial_bias*(raw_response+physio_noise);
+    end
+end
+
+function detrended_data = detrend(data)
+     detrended_data = cell(size(data,1),1);
+    for i=1:size(data,1)
+        % Linear, first order sinusoidal and mean detrending
+        nvols = size(data{i},2);
+        linear_trend=1:nvols;
+        sin_trend=sin((linear_trend)*2*pi/(nvols-1));
+        cos_trend=cos((linear_trend)*2*pi/(nvols-1));
+        mean_trend = ones(1,nvols);
+        dt_design = [linear_trend;sin_trend;cos_trend;mean_trend];
+
+        trend = data{i}/dt_design;
+        est = trend*dt_design;
+        detrended_data{i} = data{i} - est;
+    end
+end
+
+function scatter_plot(params,dplus,dminus,deming)
     %Generate deming plots for comparison with real data
-    fname = sprintf('sim_scatter/TaskD_TaskND_pnoise_%g_tnoise_%g_salient_%g_bias_%g_att_%g.png',pnoise,tnoise,1,cur_bias,cur_att);
-    if count==1 & pflag
-        figure
-        scatter(measured_bold_task_dminus,measured_bold_task_dplus)
-        axis_limits = floor(max([measured_bold_task_dminus;measured_bold_task_dplus]))+1;
-        ylim([-axis_limits axis_limits]);
-        xlim([-axis_limits axis_limits]);
-        ylabel('TaskD+')
-        xlabel('TaskD-')
-        xFit = linspace(-axis_limits ,axis_limits, 1000);
-        yFit = polyval([taskD_taskND,slope_taskD_taskND(1)] , xFit);
-        hold on;
-        plot(xFit, yFit, 'r-')
-        saveas(gcf,fname,'png');
-        close all
-    end  
-    
+    fname = sprintf('sim_scatter/dplus_dminus_physio_sigma_%g_thermal_sigma_%g_bias_%g_att_%g.png',params.physio_sigma,params.thermal_sigma,params.superficial_bias,params.attentional_modulation);
+    figure
+    scatter(dminus.contrast_estimates,dplus.contrast_estimates)
+    axis_limits = floor(max([dminus.contrast_estimates;dplus.contrast_estimates]))+1;
+    ylim([-axis_limits axis_limits]);
+    xlim([-axis_limits axis_limits]);
+    ylabel('TaskD+')
+    xlabel('TaskD-')
+    xFit = linspace(-axis_limits ,axis_limits, 1000);
+    yFit = polyval([deming(2),deming(1)] , xFit);
+    hold on;
+    plot(xFit, yFit, 'r-')
+    saveas(gcf,fname,'png');
+    close all
 end
