@@ -189,9 +189,9 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_va
     dplus.beta_estimates = dplus.detrended_response/dplus.detrended_design;
     dplus.contrast_estimates = dplus.beta_estimates(:,1)-dplus.beta_estimates(:,2);
     
-    %Store BOLD responses for reference
-    estimates.dplus_real_bold_response = dplus.face_response'-dplus.house_response';
-    estimates.dplus_measured_bold_response = dplus.contrast_estimates;
+%     %Store BOLD responses for reference
+%     estimates.dplus_real_bold_response = dplus.face_response'-dplus.house_response';
+%     estimates.dplus_measured_bold_response = dplus.contrast_estimates;
     
 
     %======================================================================
@@ -212,10 +212,10 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_va
     firing_rate.house = 1;
     dminus.house_response = calc_voxel_response(firing_rate, n_neurons, attention);
     
-    dminus.measured_response_array = calc_measured_response(dminus,glm.design(1),params);
+    dminus.measured_response_array = calc_measured_response(dminus,glm.design(2),params);
     
     dminus.detrended_response_array = detrend(dminus.measured_response_array);
-    dminus.detrended_design_array = detrend(glm.design(1).design_mat);
+    dminus.detrended_design_array = detrend(glm.design(2).design_mat);
     
     dminus.detrended_response = horzcat(dminus.detrended_response_array{:});
     dminus.detrended_design = horzcat(dminus.detrended_design_array{:});
