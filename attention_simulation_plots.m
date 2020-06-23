@@ -7,12 +7,12 @@ function attention_simulation_plots(filename)
 % define which values we are interested in
 % Change the values here to query different results
 physio_sigma_list = repmat(8,1,3);
-thermal_sigma_list = repmat(12,1,3);
+thermal_sigma_list = repmat(15,1,3);
 superficial_bias = [2, 1.5, 1];
-attentional_modulation = [3 2 3];             
+attentional_modulation = [3 2 3];  
 
 cmap = [8 81 156;
-    107 174 214;
+    107 174 214; 
     189 215 231];
 cmap = cmap/255;
     
@@ -30,7 +30,7 @@ for i = 1:3
     
     for j=1:size(var_names,1)
         if size([cur_estimates.(var_names{j})],1)==1 %skipping real bold response and measured bold response because they are nvox*iter matrices
-            res_table.(var_names{j})(i)=mean([cur_estimates.(var_names{j})]);
+            res_table.(var_names{j})(i)=median([cur_estimates.(var_names{j})]);
             var_table.(var_names{j})(i)=std([cur_estimates.(var_names{j})]);
             p25_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],25);
             p75_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],75);
@@ -44,13 +44,79 @@ end
 % 3. LDC
 % 4. Z-score
 
-%Combine the data into a results and error matrix
-res_mat=[attentional_modulation; res_table.deming_est; res_table.raw_ratio_est; res_table.ROI_ratio_est];
-var_mat=[zeros(1,3); var_table.deming_est; var_table.raw_ratio_est; var_table.ROI_ratio_est];
-p25_mat=[attentional_modulation; p25_table.deming_est; p25_table.raw_ratio_est; p25_table.ROI_ratio_est];
-p75_mat=[attentional_modulation; p75_table.deming_est; p75_table.raw_ratio_est; p75_table.ROI_ratio_est];
 
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting attentional modulation
+figure
+att_plot=bar(attentional_modulation);
+hold on
+att_plot.FaceColor = 'flat';
+for b=1:3
+    att_plot.CData(b,:) = cmap(b,:);
+end
+
+
+%Tidying up the plot and adding labels
+xticks([2])
+set(gca, 'XTickLabel', {'Ground Truth'});
+set(gca,'XTickLabelRotation',20);
+ylim([0 4]);
+ylabel('Attentional Modulation')
+x0=10;
+y0=10;
+width=185;
+height=500;
+set(gcf,'position',[x0,y0,width,height])
+
+%save figure
+fname = sprintf('att_%g_%g_%g_plot_att.png',attentional_modulation);
+saveas(gcf,fname,'png');
+hold off
+
+
+%--------------------------------------------------------------------------------------------
+%Plotting measured response
+figure
+att_plot=bar(res_table.dplus_measured_response);
+hold on
+att_plot.FaceColor = 'flat';
+for b=1:3
+    att_plot.CData(b,:) = cmap(b,:);
+end
+
+%Add error bars
+ngroups = 3;
+nbars = 1;
+groupwidth = min(0.8, nbars/(nbars + 1.5));
+for i = 1:nbars
+    x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
+    errorbar(x, res_table.dplus_measured_response(i,:), res_table.dplus_measured_response(i,:)-p25_table.dplus_measured_response(i,:),p75_table.dplus_measured_response(i,:)-res_table.dplus_measured_response(i,:), 'k.');
+end
+
+%Tidying up the plot and adding labels
+xticks([2])
+set(gca, 'XTickLabel', {'Measured Response'});
+set(gca,'XTickLabelRotation',20);
+ylim([0 2.5]);
+ylabel('Attentional Modulation')
+x0=10;
+y0=10;
+width=185;
+height=500;
+set(gcf,'position',[x0,y0,width,height])
+
+%save figure
+fname = sprintf('att_%g_%g_%g_plot_measured.png',attentional_modulation);
+saveas(gcf,fname,'png');
+hold off
+
+%--------------------------------------------------------------------------------------------
+%Plotting ratio approaches
+res_mat=[res_table.deming_regression; res_table.raw_ratio; res_table.ROI_ratio];
+var_mat=[var_table.deming_regression; var_table.raw_ratio; var_table.ROI_ratio];
+p25_mat=[p25_table.deming_regression; p25_table.raw_ratio; p25_table.ROI_ratio];
+p75_mat=[p75_table.deming_regression; p75_table.raw_ratio; p75_table.ROI_ratio];
+
 figure
 att_plot=bar(res_mat);
 hold on
@@ -68,14 +134,15 @@ for i = 1:nbars
 end
 
 %Tidying up the plot and adding labels
-set(gca, 'XTickLabel', {'Ground Truth','Deming Regression','Ratio of individual voxels', 'Ratio of entire ROI'});
+xticks([1 2 3])
+set(gca, 'XTickLabel', {'Deming Regression','Voxel Ratio', 'ROI Ratio'});
 set(gca,'XTickLabelRotation',20);
-ylim([0 4]);
-ylabel('Attentional Modulation (A.U.)')
+ylim([-0.1 1.2]);
+ylabel('Selectivity (A.U.)')
 x0=10;
 y0=10;
-width=680;
-height=520;
+width=470;
+height=550;
 set(gcf,'position',[x0,y0,width,height])
 legend('Superficial','Mid','Deep','location','northwest')
 
@@ -83,9 +150,10 @@ legend('Superficial','Mid','Deep','location','northwest')
 fname = sprintf('att_%g_%g_%g_plot_1.png',attentional_modulation);
 saveas(gcf,fname,'png');
 hold off
-% 
 
-%Plot the data
+
+%--------------------------------------------------------------------------------------------
+%Plotting z-score
 figure
 att_plot=bar(res_table.zscore);
 hold on
@@ -121,8 +189,8 @@ fname = sprintf('att_%g_%g_%g_plot_2.png',attentional_modulation);
 saveas(gcf,fname,'png');
 hold off
 
-
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting SVM
 figure
 att_plot=bar(res_table.SVM);
 hold on
@@ -141,11 +209,13 @@ for i = 1:nbars
     errorbar(x, res_table.SVM(i,:), res_table.SVM(i,:)-p25_table.SVM(i,:),p75_table.SVM(i,:)-res_table.SVM(i,:), 'k.');
 end
 
+
+
 %Tidying up the plot and adding labels
 xticks([2])
 set(gca, 'XTickLabel', {'SVM Classification'});
 set(gca,'XTickLabelRotation',20);
-ylim([80 100]);
+ylim([70 100]);
 ylabel('Classification Accuracy (%)')
 x0=10;
 y0=10;
@@ -158,8 +228,8 @@ fname = sprintf('att_%g_%g_%g_plot_3.png',attentional_modulation);
 saveas(gcf,fname,'png');
 hold off
 
-
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting LDC
 figure
 att_plot=bar(res_table.LDC);
 hold on
@@ -194,5 +264,7 @@ set(gcf,'position',[x0,y0,width,height])
 fname = sprintf('att_%g_%g_%g_plot_4.png',attentional_modulation);
 saveas(gcf,fname,'png');
 hold off
+%--------------------------------------------------------------------------------------------
+
 close all
 end

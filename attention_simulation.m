@@ -28,7 +28,7 @@ end
 
 %Reduce the n_voxels or iter to reduce computational time
 % number of voxels in the ROI
-n_voxels = 500;
+n_voxels = 2500;
 
 
 %Declare GLM for this study
@@ -41,8 +41,10 @@ glm_var.n_subruns = 4; %no of subruns per attention condition (TaskD+/TaskD-)
 % two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
 physio_sigma_list = [8];
+% Dimensionality of physiological noise
+physio_vects = 20;
 % Thermal noise that is consistent across layers
-thermal_sigma_list = [12];
+thermal_sigma_list = [15];
 
 % strength of modulation (attentional)
 attention_list = [2,3];
@@ -72,10 +74,10 @@ parfor iterind=1:iter
         for thermal_sigma = thermal_sigma_list
             for superficial_bias = superficial_bias_list
                 for attentional_modulation = attention_list
-                    params = struct('physio_sigma',physio_sigma,'thermal_sigma',thermal_sigma,'superficial_bias',superficial_bias,'attentional_modulation',attentional_modulation);
+                    params = struct('physio_sigma',physio_sigma,'physio_vects',physio_vects,'thermal_sigma',thermal_sigma,'superficial_bias',superficial_bias,'attentional_modulation',attentional_modulation);
                     [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_var,params,glm);
                     if iterind==1 && pflag            % only plot first iteration
-                        scatter_plot(params,plot_vars.dplus,plot_vars.dminus,plot_vars.deming);
+                        scatter_plot(params,plot_vars.dplus,plot_vars.dminus,plot_vars.deming_regression);
                     end
                     results(iterind).params(count) = params;
                     results(iterind).estimates(count) = estimates; 
@@ -93,9 +95,9 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_va
     
     % let's suppose this example ROI has more face cells than house cells (let's call it FFA)
     % Calculating this here so that each iteration can have different frequencies
-    % For Section 4.4 results, replace "n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));" with "n_neurons.face = abs(normrnd(0,1,[1, n_voxels]));"
-    n_neurons.face = abs(normrnd(0,2,[1, n_voxels]));
-    n_neurons.house = abs(normrnd(0,1,[1, n_voxels]));
+    % For Section 4.4 results, replace "n_neurons.face = abs(normrnd(0,1.1,[1, n_voxels]));" with "n_neurons.face = abs(normrnd(0,0.5,[1, n_voxels]));"
+    n_neurons.face = abs(normrnd(0,1.45,[1, n_voxels]));
+    n_neurons.house = abs(normrnd(0,0.7,[1, n_voxels]));
     
     
     %======================================================================
@@ -189,9 +191,17 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_va
     dplus.beta_estimates = dplus.detrended_response/dplus.detrended_design;
     dplus.contrast_estimates = dplus.beta_estimates(:,1)-dplus.beta_estimates(:,2);
     
-%     %Store BOLD responses for reference
-%     estimates.dplus_real_bold_response = dplus.face_response'-dplus.house_response';
-%     estimates.dplus_measured_bold_response = dplus.contrast_estimates;
+    %Store tstat for comparison with real fMRI data
+    model_fit = dplus.beta_estimates *dplus.detrended_design;
+    dplus.residual = dplus.detrended_response - model_fit;
+    dplus.std_error = std(dplus.residual,0,2)/sqrt(size(dplus.residual,2));
+    dplus.tstat = dplus.contrast_estimates./dplus.std_error;
+    estimates.tstat_dplus_mean = mean(dplus.tstat);
+    estimates.tstat_dplus_std = std(dplus.tstat);
+    
+    %Store BOLD responses for reference
+    dplus.real_bold_response = dplus.face_response'-dplus.house_response';
+    estimates.dplus_measured_response = mean(dplus.contrast_estimates);
     
 
     %======================================================================
@@ -225,25 +235,40 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,glm_va
     dminus.beta_estimates = dminus.detrended_response/dminus.detrended_design;
     dminus.contrast_estimates = dminus.beta_estimates(:,1)-dminus.beta_estimates(:,2);
     
+    %Store tstat for comparison with real fMRI data
+    model_fit = dminus.beta_estimates *dminus.detrended_design;
+    dminus.residual = dminus.detrended_response - model_fit;
+    dminus.std_error = std(dminus.residual,0,2)/sqrt(size(dminus.residual,2));
+    dminus.tstat = dminus.contrast_estimates./dminus.std_error;
+    
+    estimates.tstat_dminus_mean = mean(dminus.tstat);
+    estimates.tstat_dminus_std = std(dminus.tstat);
+
+
+    
+    
     %======================================================================
     % Evaluating Methods 4,5 and 6
     %======================================================================
     
     % Method 4: Estimating Attention Modulation with mean(dplus/dminus)
     raw_ratio = mean(dplus.contrast_estimates./dminus.contrast_estimates);
+    estimates.raw_ratio =  raw_ratio;
     estimates.raw_ratio_est =  1/(1-raw_ratio);
     
     % Method 5: Estimating Attention Modulation with mean(dplus)/mean(dminus)
     ROI_ratio = mean(dplus.contrast_estimates)/mean(dminus.contrast_estimates);
+    estimates.ROI_ratio =  ROI_ratio;
     estimates.ROI_ratio_est =  1/(1-ROI_ratio);
    
     % Method 6: Estimating Attention Modulation with dplus/dminus Deming Regression
-    deming_ratio = deming(dminus.contrast_estimates,dplus.contrast_estimates);
-    estimates.deming_est = 1/(1-deming_ratio(2));
+    deming_regression = deming(dminus.contrast_estimates,dplus.contrast_estimates);
+    estimates.deming_regression =  deming_regression(2);
+    estimates.deming_est = 1/(1-deming_regression(2));
     
     
     % Assigning variables needed for plotting 
-    plot_vars=struct('dplus',dplus,'dminus',dminus,'deming',deming_ratio);
+    plot_vars=struct('dplus',dplus,'dminus',dminus,'deming_regression',deming_regression);
 
     
 end
@@ -273,7 +298,7 @@ function glm = create_glm(glm_var)
             subrun{k} = subrun{k}(randperm(length(subrun{k}))); 
             %Structure is long_rest-subrun
             %Define start times for each subrun and input into design matrix
-            sr1_start = glm_var.restdur;
+            sr1_start = glm_var.restdur+1;
 
             cur_timepoint = sr1_start;
             for i=1:length(subrun{k})
@@ -293,7 +318,7 @@ function glm = create_glm(glm_var)
                     SVM_design(c1_count,cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
                     c1_count = c1_count+1;
                 else
-                    SVM_design(10+c2_count,cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
+                    SVM_design(glm_var.blocks+c2_count,cur_timepoint:cur_timepoint+glm_var.blockdur-1)=1;
                     c2_count = c2_count+1;
                     
                 end
@@ -311,10 +336,14 @@ end
 
 function measured_response = calc_measured_response(cond,design,params)
     measured_response = cell(size(design.design_mat,1),1);
+    noise_proj=normrnd(0,1,size(cond.face_response,2),params.physio_vects); % projection vector of physio noise vector on data
     for i=1:size(design.design_mat,1)
         raw_response = [cond.face_response', cond.house_response']*design.design_mat{i};
         thermal_noise = normrnd(0,1,size(raw_response))*params.thermal_sigma;
-        physio_noise = normrnd(0,1,size(raw_response))*params.physio_sigma;
+        noise_vect=normrnd(0,1,params.physio_vects,size(raw_response,2));   % physio noise vector that is projected across different voxels
+        physio_rnd = noise_proj*noise_vect;
+        physio_rnd = physio_rnd/sqrt(params.physio_vects/2);
+        physio_noise = physio_rnd * params.physio_sigma;
         measured_response{i} = thermal_noise+params.superficial_bias*(raw_response+physio_noise);
     end
 end
@@ -336,20 +365,22 @@ function detrended_data = detrend(data)
     end
 end
 
-function scatter_plot(params,dplus,dminus,deming)
+function scatter_plot(params,dplus,dminus,deming_regression)
     %Generate deming plots for comparison with real data
     fname = sprintf('sim_scatter/dplus_dminus_physio_sigma_%g_thermal_sigma_%g_bias_%g_att_%g.png',params.physio_sigma,params.thermal_sigma,params.superficial_bias,params.attentional_modulation);
     figure
     scatter(dminus.contrast_estimates,dplus.contrast_estimates)
-    axis_limits = floor(max([dminus.contrast_estimates;dplus.contrast_estimates]))+1;
+    axis_limits = floor(max([dminus.contrast_estimates;dplus.contrast_estimates])/5)*5;
     ylim([-axis_limits axis_limits]);
     xlim([-axis_limits axis_limits]);
     ylabel('TaskD+')
     xlabel('TaskD-')
     xFit = linspace(-axis_limits ,axis_limits, 1000);
-    yFit = polyval([deming(2),deming(1)] , xFit);
+    yFit = polyval([deming_regression(2),deming_regression(1)] , xFit);
     hold on;
     plot(xFit, yFit, 'r-')
+    ax = gca
+    ax.FontSize = 10;
     saveas(gcf,fname,'png');
     close all
 end
