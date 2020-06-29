@@ -161,20 +161,13 @@ d.contrast_estimates = d.beta_estimates(:,1)-d.beta_estimates(:,2);
 
 %Store tstat for comparison with real fMRI data
 model_fit = d.beta_estimates * d.detrended_design;
-d.residual = d.detrended_response - model_fit;
-d.std_error = std(d.residual,0,2)/sqrt(size(d.residual,2));
-d.tstat = d.contrast_estimates./d.std_error;
-
-% johan proposal (slightly over-general for this context)
+residual = d.detrended_response - model_fit;
 df = size(d.residual, 2) - rank(d.detrended_design');
 mrss = sum(d.residual.^2, 2) / df;
 cmat = inv(d.detrended_design * d.detrended_design');
 convec = [1 -1];
 se = sqrt(diag(convec * cmat * convec') * mrss);
-% about half the size of tstat_dplus_mean above
-t = d.contrast_estimates ./ se;
-% d.tstat = t;
-% / johan
+d.tstat = d.contrast_estimates ./ se;
 
 %Store BOLD responses for reference
 d.real_bold_response = d.face_response'-d.house_response';
