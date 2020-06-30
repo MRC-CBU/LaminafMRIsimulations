@@ -138,8 +138,7 @@ function measured_response = calc_measured_response(condition,design,params)
         thermal_noise = normrnd(0,1,size(raw_response))*params.thermal_sigma;
         noise_vect=normrnd(0,1,params.physio_vects,size(raw_response,2));   % physio noise vector that is projected across different voxels
         physio_noise = noise_proj*noise_vect;
-        % why divide by 2?
-        physio_noise = physio_noise/sqrt(params.physio_vects/2);
+        physio_noise = physio_noise/sqrt(params.physio_vects);
         physio_noise = physio_noise * params.physio_sigma;
         measured_response{i} = thermal_noise+params.superficial_bias*(raw_response+physio_noise);
     end
