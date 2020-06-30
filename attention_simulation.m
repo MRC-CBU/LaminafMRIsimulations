@@ -43,7 +43,7 @@ sim_par.n_neurons_house_sigma = 0.7; % same for house cell frequency
 
 % two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
-physio_sigma_list = [8];
+physio_sigma_list = [11];
 % Dimensionality of physiological noise
 physio_vects = 20; % why not 10 as in HBM sim?
 % Thermal noise that is consistent across layers
