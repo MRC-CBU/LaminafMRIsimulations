@@ -160,7 +160,7 @@ d.contrast_estimates = d.beta_estimates(:,1)-d.beta_estimates(:,2);
 
 %Store tstat for comparison with real fMRI data
 model_fit = d.beta_estimates * d.detrended_design;
-residual = d.detrended_response - model_fit;
+d.residual = d.detrended_response - model_fit;
 df = size(d.residual, 2) - rank(d.detrended_design');
 mrss = sum(d.residual.^2, 2) / df;
 cmat = inv(d.detrended_design * d.detrended_design');
