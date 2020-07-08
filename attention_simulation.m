@@ -37,9 +37,9 @@ sim_par.blocks = 10; %no of blocks of house/face for each subrun
 sim_par.blockdur = 6; %block dur in terms of TR
 sim_par.restdur = 1; %rest dur between blocks in terms of TR
 sim_par.n_subruns = 4; %no of subruns per attention condition (TaskD+/TaskD-)
-% For Section 4.4 results, set both to 0.7 
-sim_par.n_neurons_face_sigma = 1.45; % sigma of half-Gaussian controlling face cell frequency per voxel
-sim_par.n_neurons_house_sigma = 0.7; % same for house cell frequency
+% For Section 4.4 results, set both to 1.1 
+sim_par.n_neurons_face_sigma = 1.1; % sigma of half-Gaussian controlling face cell frequency per voxel
+sim_par.n_neurons_house_sigma = 0.5; % same for house cell frequency
 
 % two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
