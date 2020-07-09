@@ -3,7 +3,7 @@ Based on PhD work of Huang Pei (HP)
 
 ## List of files
 ### Simulation files
-attention_simulation.m - main function used to generate the simulation results. Calls the following subfunctions: attention_simulation_iteration.m, covdiag.m, create_glm.m, deming.m and detrend_timecourse.m. \n
+attention_simulation.m - main function used to generate the simulation results. Calls the following subfunctions: attention_simulation_iteration.m, covdiag.m, create_glm.m, deming.m and detrend_timecourse.m. \
 attention_simulation_plots.m - Searches the list of outputs from attention_simulation.m for the corresponding examples and generates the graphs.
 attention_simulation_contri_plots.m - Similar to attention_simulation_plots.m, but plots the relative contributions of laminar bias and attentional modulation on the data.
 
