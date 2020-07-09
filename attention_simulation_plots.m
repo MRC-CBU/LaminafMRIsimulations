@@ -6,7 +6,7 @@ function attention_simulation_plots(filename)
 
 % define which values we are interested in
 % Change the values here to query different results
-physio_sigma_list = repmat(8,1,3);
+physio_sigma_list = repmat(11,1,3);
 thermal_sigma_list = repmat(15,1,3);
 superficial_bias = [2, 1.5, 1];
 attentional_modulation = [3 2 3];  
@@ -215,7 +215,7 @@ end
 xticks([2])
 set(gca, 'XTickLabel', {'SVM Classification'});
 set(gca,'XTickLabelRotation',20);
-ylim([70 100]);
+ylim([50 100]);
 ylabel('Classification Accuracy (%)')
 x0=10;
 y0=10;
