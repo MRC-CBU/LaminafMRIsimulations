@@ -1,4 +1,17 @@
-function attention_plots(filename)
+function attention_plots(res)
+% Plot the real fMRI results in a similar manner to the simulated data (see
+% attention_simulation_plots.m).
+%
+% If the input real_results is undefined, we load the sample result from
+% sample_results/real_fMRI_results.mat
+%
+% attention_plots(filename)
+
+if ~exist('res', 'var') || isempty(res)
+    % default to example pre-computed results
+    res = load(fullfile(fileparts(mfilename('fullpath')), ...
+        'sample_results', 'real_fMRI_results.mat'));
+end
 
 cmap = [8 81 156;
     49 130 189;
@@ -17,7 +30,6 @@ lmap = [31 120 180; %blue
 cmap = cmap/255;
 lmap = lmap/255;
 
-res = load(filename); 
 res = res.results_exclude;
 
 %convert results into matrix form
@@ -57,8 +69,8 @@ end
 xticks([1 2 3])
 set(gca, 'XTickLabel', {'Deming Regression','Voxel Ratio', 'ROI Ratio'});
 set(gca,'XTickLabelRotation',20);
-ylim([-0.5 2.5]);
-ylabel('Selectivity (A.U.)')
+% ylim([-0.5 2.5]);
+ylabel('Median selectivity (A.U.)')
 x0=10;
 y0=10;
 width=570;
@@ -79,7 +91,7 @@ for layer = 1:3
         end
     end
 end
-legend('Superficial','Mid','Deep','location','northwest')
+legend('Superficial','Middle','Deep','location','northwest')
 
 %save figure
 fname = 'plot_1.png';
@@ -113,7 +125,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'Z-scoring'});
 set(gca,'XTickLabelRotation',20);
 %ylim([0 10]);
-ylabel('Z-scoring (A.U.)')
+ylabel('Median region-mean contrast estimate (A.U.)')
 x0=10;
 y0=10;
 width=190;
@@ -153,7 +165,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'SVM Classification'});
 set(gca,'XTickLabelRotation',20);
 ylim([50 100]);
-ylabel('Classification Accuracy (%)')
+ylabel('Median classification accuracy (%)')
 x0=10;
 y0=10;
 width=185;
@@ -193,7 +205,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'LDC'});
 set(gca,'XTickLabelRotation',20);
 %ylim([60 100]);
-ylabel('Linear Discriminant Contrast (A.U.)')
+ylabel('Median linear discriminant contrast (A.U.)')
 x0=10;
 y0=10;
 width=180;
