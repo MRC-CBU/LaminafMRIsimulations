@@ -1,4 +1,8 @@
 function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_par,iter_par,glm)
+% Run one iteration of the simulation. For example usage and input variables, see
+% attention_simulation.m.
+%
+% [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_par,iter_par,glm)
     
     % let's suppose this example ROI has more face cells than house cells (let's call it FFA)
     % Calculating this here so that each iteration can have different frequencies
