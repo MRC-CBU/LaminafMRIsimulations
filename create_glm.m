@@ -1,4 +1,8 @@
 function glm = create_glm(glm_var)
+% Construct convolved design matrix to match the real fMRI experiment. glm_var is a
+% struct that defines the design - for example definition see attention_simulation.m.
+%
+% glm = create_glm(glm_var)
 glm.subrun_length = 2*glm_var.restdur+2*glm_var.blocks*(glm_var.blockdur+glm_var.restdur); 
 glm.hrf_distri = spm_hrf(glm_var.TR)';
 contexts = {'taskdplus', 'taskdminus'};
