@@ -1,4 +1,4 @@
-function attention_plots(res)
+function attention_plots(res_file)
 % Plot the real fMRI results in a similar manner to the simulated data (see
 % attention_simulation_plots.m).
 %
@@ -7,10 +7,9 @@ function attention_plots(res)
 %
 % attention_plots(filename)
 
-if ~exist('res', 'var') || isempty(res)
+if ~exist('res_file', 'var') || isempty(res_file)
     % default to example pre-computed results
-    res = load(fullfile(fileparts(mfilename('fullpath')), ...
-        'sample_results', 'real_fMRI_results.mat'));
+    res_file = fullfile(fileparts(mfilename('fullpath')),'sample_results', 'real_fMRI_results.mat');
 end
 
 cmap = [8 81 156;
@@ -30,6 +29,7 @@ lmap = [31 120 180; %blue
 cmap = cmap/255;
 lmap = lmap/255;
 
+res = load(res_file);  
 res = res.results_exclude;
 
 %convert results into matrix form
