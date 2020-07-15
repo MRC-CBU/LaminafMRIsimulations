@@ -1,4 +1,4 @@
-function attention_simulation_plots(res)
+function attention_simulation_plots(res_file)
 % Plot results from the output of attention_simulation.m
 % This function queries the output for the parameters we are interested in
 % and generate plots comparing the ground truth against the various
@@ -7,11 +7,10 @@ function attention_simulation_plots(res)
 % If the input res is undefined, we load the sample result from
 % sample_results/att_sim_results.mat
 %
-% attention_simulation_plots(res)
+% attention_simulation_plots(res_file)
 
-if ~exist('res', 'var') || isempty(res)
-    res = load(fullfile(fileparts(mfilename('fullpath')), ...
-        'sample_results', 'att_sim_results.mat'));
+if ~exist('res_file', 'var') || isempty(res_file)
+    res_file = fullfile(fileparts(mfilename('fullpath')),'sample_results', 'att_sim_results.mat');
 end
 
 % define which values we are interested in
@@ -26,6 +25,7 @@ cmap = [8 81 156;
     189 215 231];
 cmap = cmap/255;
     
+res = load(res_file);  
 res = res.results;
 
 %Extract the 3 rows
