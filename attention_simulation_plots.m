@@ -1,8 +1,18 @@
-function attention_simulation_plots(filename)
-% Plotting results from the output of attention_simulation.m
+function attention_simulation_plots(res)
+% Plot results from the output of attention_simulation.m
 % This function queries the output for the parameters we are interested in
 % and generate plots comparing the ground truth against the various
 % estimates using the different metrics.
+% 
+% If the input res is undefined, we load the sample result from
+% sample_results/att_sim_results.mat
+%
+% attention_simulation_plots(res)
+
+if ~exist('res', 'var') || isempty(res)
+    res = load(fullfile(fileparts(mfilename('fullpath')), ...
+        'sample_results', 'att_sim_results.mat'));
+end
 
 % define which values we are interested in
 % Change the values here to query different results
@@ -16,7 +26,6 @@ cmap = [8 81 156;
     189 215 231];
 cmap = cmap/255;
     
-res = load(filename); 
 res = res.results;
 
 %Extract the 3 rows
@@ -30,8 +39,7 @@ for i = 1:3
     
     for j=1:size(var_names,1)
         if size([cur_estimates.(var_names{j})],1)==1 %skipping real bold response and measured bold response because they are nvox*iter matrices
-            res_table.(var_names{j})(i)=median([cur_estimates.(var_names{j})]);
-            var_table.(var_names{j})(i)=std([cur_estimates.(var_names{j})]);
+            median_table.(var_names{j})(i)=median([cur_estimates.(var_names{j})]);
             p25_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],25);
             p75_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],75);
         end
@@ -61,7 +69,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'Ground Truth'});
 set(gca,'XTickLabelRotation',20);
 ylim([0 4]);
-ylabel('Attentional Modulation')
+ylabel({'Attentional modulation', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=185;
@@ -77,7 +85,7 @@ hold off
 %--------------------------------------------------------------------------------------------
 %Plotting measured response
 figure
-att_plot=bar(res_table.dplus_measured_response);
+att_plot=bar(median_table.dplus_measured_response);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -90,15 +98,15 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.dplus_measured_response(i,:), res_table.dplus_measured_response(i,:)-p25_table.dplus_measured_response(i,:),p75_table.dplus_measured_response(i,:)-res_table.dplus_measured_response(i,:), 'k.');
+    errorbar(x, median_table.dplus_measured_response(i,:), median_table.dplus_measured_response(i,:)-p25_table.dplus_measured_response(i,:),p75_table.dplus_measured_response(i,:)-median_table.dplus_measured_response(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
 xticks([2])
 set(gca, 'XTickLabel', {'Measured Response'});
 set(gca,'XTickLabelRotation',20);
-ylim([0 2.5]);
-ylabel('Attentional Modulation')
+% ylim([0 2.5]);
+ylabel({'Attentional modulation', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=185;
@@ -112,39 +120,38 @@ hold off
 
 %--------------------------------------------------------------------------------------------
 %Plotting ratio approaches
-res_mat=[res_table.deming_regression; res_table.raw_ratio; res_table.ROI_ratio];
-var_mat=[var_table.deming_regression; var_table.raw_ratio; var_table.ROI_ratio];
+med_mat=[median_table.deming_regression; median_table.raw_ratio; median_table.ROI_ratio];
 p25_mat=[p25_table.deming_regression; p25_table.raw_ratio; p25_table.ROI_ratio];
 p75_mat=[p75_table.deming_regression; p75_table.raw_ratio; p75_table.ROI_ratio];
 
 figure
-att_plot=bar(res_mat);
+att_plot=bar(med_mat);
 hold on
 for b=1:3
     att_plot(b).FaceColor = cmap(b,:);
 end
 
 %Add error bars
-ngroups = size(res_mat, 1);
-nbars = size(res_mat, 2);
+ngroups = size(med_mat, 1);
+nbars = size(med_mat, 2);
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_mat(:,i), res_mat(:,i)-p25_mat(:,i),p75_mat(:,i)-res_mat(:,i), 'k.');
+    errorbar(x, med_mat(:,i), med_mat(:,i)-p25_mat(:,i),p75_mat(:,i)-med_mat(:,i), 'k.');
 end
 
 %Tidying up the plot and adding labels
 xticks([1 2 3])
 set(gca, 'XTickLabel', {'Deming Regression','Voxel Ratio', 'ROI Ratio'});
 set(gca,'XTickLabelRotation',20);
-ylim([-0.1 1.2]);
-ylabel('Selectivity (A.U.)')
+% ylim([-0.1 1.2]);
+ylabel({'Selectivity (A.U.)', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=470;
 height=550;
 set(gcf,'position',[x0,y0,width,height])
-legend('Superficial','Mid','Deep','location','northwest')
+legend('Superficial','Middle','Deep','location','northwest')
 
 %save figure
 fname = sprintf('att_%g_%g_%g_plot_1.png',attentional_modulation);
@@ -155,7 +162,7 @@ hold off
 %--------------------------------------------------------------------------------------------
 %Plotting z-score
 figure
-att_plot=bar(res_table.zscore);
+att_plot=bar(median_table.zscore);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -169,7 +176,7 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.zscore(i,:), res_table.zscore(i,:)-p25_table.zscore(i,:),p75_table.zscore(i,:)-res_table.zscore(i,:), 'k.');
+    errorbar(x, median_table.zscore(i,:), median_table.zscore(i,:)-p25_table.zscore(i,:),p75_table.zscore(i,:)-median_table.zscore(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
@@ -177,7 +184,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'Z-scoring'});
 set(gca,'XTickLabelRotation',20);
 %ylim([0 10]);
-ylabel('Z-scoring (A.U.)')
+ylabel({'Region-mean contrast estimate (A.U.)', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=190;
@@ -192,7 +199,7 @@ hold off
 %--------------------------------------------------------------------------------------------
 %Plotting SVM
 figure
-att_plot=bar(res_table.SVM);
+att_plot=bar(median_table.SVM);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -206,7 +213,7 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.SVM(i,:), res_table.SVM(i,:)-p25_table.SVM(i,:),p75_table.SVM(i,:)-res_table.SVM(i,:), 'k.');
+    errorbar(x, median_table.SVM(i,:), median_table.SVM(i,:)-p25_table.SVM(i,:),p75_table.SVM(i,:)-median_table.SVM(i,:), 'k.');
 end
 
 
@@ -216,7 +223,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'SVM Classification'});
 set(gca,'XTickLabelRotation',20);
 ylim([50 100]);
-ylabel('Classification Accuracy (%)')
+ylabel({'Classification accuracy (%)', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=185;
@@ -231,7 +238,7 @@ hold off
 %--------------------------------------------------------------------------------------------
 %Plotting LDC
 figure
-att_plot=bar(res_table.LDC);
+att_plot=bar(median_table.LDC);
 hold on
 att_plot.FaceColor = 'flat';
 for b=1:3
@@ -245,7 +252,7 @@ nbars = 1;
 groupwidth = min(0.8, nbars/(nbars + 1.5));
 for i = 1:nbars
     x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
-    errorbar(x, res_table.LDC(i,:), res_table.LDC(i,:)-p25_table.LDC(i,:),p75_table.LDC(i,:)-res_table.LDC(i,:), 'k.');
+    errorbar(x, median_table.LDC(i,:), median_table.LDC(i,:)-p25_table.LDC(i,:),p75_table.LDC(i,:)-median_table.LDC(i,:), 'k.');
 end
 
 %Tidying up the plot and adding labels
@@ -253,7 +260,7 @@ xticks([2])
 set(gca, 'XTickLabel', {'LDC'});
 set(gca,'XTickLabelRotation',20);
 %ylim([60 100]);
-ylabel('Linear Discriminant Contrast (A.U.)')
+ylabel({'Linear discriminant contrast (A.U.)', '(median \pm25 percentiles)'});
 x0=10;
 y0=10;
 width=180;

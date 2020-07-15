@@ -1,15 +1,10 @@
-% Simulate attention and layer effects for Deming regression paper. 
-% Objectives:
-% 1. Simulate effects of attention in voxels for two conditions TaskD+ (dplus) and TaskD- (dminus)
-% 2. Generate simulated fMRI data with superficial bias, thermal and physiological noise (measured_response) 
-% 3. Apply sinusoidal, linear and mean detrending to the data
-% 4. Generate scatterplots for comparison with real data to obtain estimates of noise for simulation
-% 5. Demonstrate that our multiplicative gain factor mimics real data   
-% 6. Utilize various metrics to recover the underlying attention modulation in response to different parameter levels
-% 7. Generate a tabulated list of data to be queried by a seperate function and generate laminar profiles of different attention modulations. 
-
-
 function attention_simulation(iter, pflag)
+% Simulate attention and layer bias effects for Deming regression paper. 
+%
+% if iter is undefined, it defaults to 10000 iterations
+% if pflag is undefined, it defaults to true (plot the Deming scatter figure)
+%
+% attention_simulation(iter, pflag)
 
 % Add SPM to path (needed for the hrf function)
 if isempty(which('spm_hrf'))
