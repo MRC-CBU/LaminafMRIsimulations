@@ -38,19 +38,19 @@ for i = 1:3
     cur_estimates = estimates(match==1);
     
     for j=1:size(var_names,1)
-        if size([cur_estimates.(var_names{j})],1)==1 %skipping real bold response and measured bold response because they are nvox*iter matrices
-            median_table.(var_names{j})(i)=median([cur_estimates.(var_names{j})]);
-            p25_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],25);
-            p75_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],75);
-        end
+        median_table.(var_names{j})(i)=median([cur_estimates.(var_names{j})]);
+        p25_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],25);
+        p75_table.(var_names{j})(i)=prctile([cur_estimates.(var_names{j})],75);
     end
 end
    
 % Split into multiple plots:
-% 1. Att Modulation/Deming/Mean/MeanROI
-% 2. SVM
-% 3. LDC
-% 4. Z-score
+% Att Modulation
+% 1. Deming/Mean/MeanROI
+% 2. Z-score
+% 3. SVM
+% 4. LDC
+% 5. L2 normalization
 
 
 %--------------------------------------------------------------------------------------------
@@ -271,6 +271,47 @@ set(gcf,'position',[x0,y0,width,height])
 fname = sprintf('att_%g_%g_%g_plot_4.png',attentional_modulation);
 saveas(gcf,fname,'png');
 hold off
+
+%--------------------------------------------------------------------------------------------
+%Plotting l2_dplus
+figure
+att_plot=bar(median_table.l2_dplus);
+hold on
+att_plot.FaceColor = 'flat';
+for b=1:3
+    att_plot.CData(b,:) = cmap(b,:);
+end
+
+
+%Add error bars
+ngroups = 3;
+nbars = 1;
+groupwidth = min(0.8, nbars/(nbars + 1.5));
+for i = 1:nbars
+    x = (1:ngroups) - groupwidth/2 + (2*i-1) * groupwidth / (2*nbars);
+    errorbar(x, median_table.l2_dplus(i,:), median_table.l2_dplus(i,:)-p25_table.l2_dplus(i,:),p75_table.l2_dplus(i,:)-median_table.l2_dplus(i,:), 'k.');
+end
+
+%Tidying up the plot and adding labels
+xticks([2])
+set(gca, 'XTickLabel', {'L2 norm'});
+set(gca,'XTickLabelRotation',20);
+%ylim([60 100]);
+ylabel({'Region-mean contrast estimate (A.U.)', '(median \pm25 percentiles)'});
+x0=10;
+y0=10;
+width=180;
+height=500;
+set(gcf,'position',[x0,y0,width,height])
+
+%save figure
+fname = sprintf('att_%g_%g_%g_plot_5.png',attentional_modulation);
+saveas(gcf,fname,'png');
+hold off
+
+%--------------------------------------------------------------------------------------------
+
+
 %--------------------------------------------------------------------------------------------
 
 close all

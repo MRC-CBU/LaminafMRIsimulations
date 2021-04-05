@@ -31,6 +31,7 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_pa
     %Method 1: Z-scoring
     dplus.zbeta_estimates = zscore(dplus.detrended_response')'/dplus.detrended_design;
     estimates.zscore = mean(dplus.zbeta_estimates(:,1)-dplus.zbeta_estimates(:,2));
+
     
     %Method 2: SVM classifier for TaskD+
     svm_correct = {};
@@ -67,7 +68,6 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_pa
         train_predict = train_betas*train_design;
         train_res = train_data - train_predict;
         train_cov = covdiag(train_res');
-        % what does this do?
         train_cov = train_cov./size(train_cov,1);
         weights = train_con' / train_cov;
         
@@ -119,6 +119,13 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_pa
     deming_regression = deming(dminus.contrast_estimates,dplus.contrast_estimates);
     estimates.deming_regression =  deming_regression(2);
     estimates.deming_est = 1/(1-estimates.deming_regression);
+
+    % Method 7: L2 norm (Kay et al., 2019)
+    vox_norm = sqrt(sum([dplus.beta_estimates dminus.beta_estimates] .^2, 2));
+    dplus_bnorm = bsxfun(@rdivide, dplus.beta_estimates, vox_norm);
+    dminus_bnorm = bsxfun(@rdivide, dminus.beta_estimates, vox_norm);
+    estimates.l2_dplus = mean(dplus_bnorm * [1; -1], 1);
+    estimates.l2_inter = mean([dminus_bnorm dplus_bnorm] * [1; -1; -1; 1], 1);
     
     % Assigning variables needed for plotting 
     plot_vars=struct('dplus',dplus,'dminus',dminus,'deming_regression',deming_regression);
@@ -139,12 +146,13 @@ function measured_response = calc_measured_response(condition,design,params)
     noise_proj=normrnd(0,1,size(condition.face_response,2),params.physio_vects); % projection vector of physio noise vector on data
     for i=1:size(design.design_mat,1)
         raw_response = [condition.face_response', condition.house_response']*design.design_mat{i};
-        thermal_noise = normrnd(0,1,size(raw_response))*params.thermal_sigma;
+        raw_response = raw_response+params.baseline;
         noise_vect=normrnd(0,1,params.physio_vects,size(raw_response,2));   % physio noise vector that is projected across different voxels
         physio_noise = noise_proj*noise_vect;
         physio_noise = physio_noise/sqrt(params.physio_vects);
         physio_noise = physio_noise * params.physio_sigma;
-        measured_response{i} = thermal_noise+params.superficial_bias*(raw_response+physio_noise);
+        laminar_response = params.superficial_bias*(raw_response+physio_noise);
+        measured_response{i} = ricernd(laminar_response,params.thermal_sigma);
     end
 end
 

@@ -34,15 +34,17 @@ sim_par.restdur = 1; %rest dur between blocks in terms of TR
 sim_par.n_subruns = 4; %no of subruns per attention condition (TaskD+/TaskD-)
 % For Section 4.4 results, set both to 1.1 
 sim_par.n_neurons_face_sigma = 1.1; % sigma of half-Gaussian controlling face cell frequency per voxel
-sim_par.n_neurons_house_sigma = 0.5; % same for house cell frequency
+sim_par.n_neurons_house_sigma = 1.1; % same for house cell frequency
 
 % two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
 physio_sigma_list = [11];
 % Dimensionality of physiological noise
-physio_vects = 20; % why not 10 as in HBM sim?
+physio_vects = 20; 
 % Thermal noise that is consistent across layers
 thermal_sigma_list = [15];
+% Baseline signal (constant across time, removed by
+baseline=100;
 
 % strength of modulation (attentional)
 attention_list = [2,3];
@@ -72,7 +74,7 @@ parfor iterind=1:iter
         for thermal_sigma = thermal_sigma_list
             for superficial_bias = superficial_bias_list
                 for attentional_modulation = attention_list
-                    iter_par = struct('physio_sigma',physio_sigma,'physio_vects',physio_vects,'thermal_sigma',thermal_sigma,'superficial_bias',superficial_bias,'attentional_modulation',attentional_modulation);
+                    iter_par = struct('physio_sigma',physio_sigma,'physio_vects',physio_vects,'thermal_sigma',thermal_sigma,'superficial_bias',superficial_bias,'attentional_modulation',attentional_modulation,'baseline',baseline);
                     [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_par,iter_par,glm);
                     if iterind==1 && pflag            % only plot first iteration
                         scatter_plot(iter_par,plot_vars.dplus,plot_vars.dminus,plot_vars.deming_regression);
@@ -85,7 +87,7 @@ parfor iterind=1:iter
         end
     end
 end
-save('att_sim_results.mat','results');
+save('att_sim_results_samepref.mat','results');
 
 end
 
@@ -95,7 +97,7 @@ function scatter_plot(params,dplus,dminus,deming_regression)
     fname = sprintf('sim_scatter/dplus_dminus_physio_sigma_%g_thermal_sigma_%g_bias_%g_att_%g.png',params.physio_sigma,params.thermal_sigma,params.superficial_bias,params.attentional_modulation);
     figure
     scatter(dminus.contrast_estimates,dplus.contrast_estimates)
-    axis_limits = floor(max([dminus.contrast_estimates;dplus.contrast_estimates])/5)*5;
+    axis_limits = (floor(max([dminus.contrast_estimates;dplus.contrast_estimates])/5)+1)*5;
     ylim([-axis_limits axis_limits]);
     xlim([-axis_limits axis_limits]);
     ylabel('TaskD+')

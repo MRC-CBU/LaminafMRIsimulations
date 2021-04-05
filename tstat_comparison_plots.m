@@ -32,11 +32,11 @@ for layer = 1:3 % 1=deep, 2=middle, 3=superficial
     tstd_dplus_real = zeros(6,1);
     tstd_dminus_real = zeros(6,1);
     for i=1:6
-        tmean_dplus_real(i) = real_results.results_exclude(i).estimates(layer).tstat_dplus_mean;
-        tstd_dplus_real(i) = real_results.results_exclude(i).estimates(layer).tstat_dplus_std;
+        tmean_dplus_real(i) = real_results.results(i).estimates(layer).tstat_dplus_mean;
+        tstd_dplus_real(i) = real_results.results(i).estimates(layer).tstat_dplus_std;
 
-        tmean_dminus_real(i) = real_results.results_exclude(i).estimates(layer).tstat_dminus_mean;
-        tstd_dminus_real(i) = real_results.results_exclude(i).estimates(layer).tstat_dminus_std;
+        tmean_dminus_real(i) = real_results.results(i).estimates(layer).tstat_dminus_mean;
+        tstd_dminus_real(i) = real_results.results(i).estimates(layer).tstat_dminus_std;
     end
 
     fprintf('Real fMRI data \n')

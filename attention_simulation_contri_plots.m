@@ -49,7 +49,7 @@ end
 
 niter = size(res_initial.deming_regression,1);
 %Order res_table in plotting order
-res_table = struct('ground_truth',attentional_modulation,'deming_regression',res_initial.deming_regression,'raw_ratio',res_initial.raw_ratio,'ROI_ratio',res_initial.ROI_ratio,'zscore',res_initial.zscore,'SVM',res_initial.SVM,'LDC',res_initial.LDC);
+res_table = struct('ground_truth',attentional_modulation,'deming_regression',res_initial.deming_regression,'raw_ratio',res_initial.raw_ratio,'ROI_ratio',res_initial.ROI_ratio,'zscore',res_initial.zscore,'SVM',res_initial.SVM,'LDC',res_initial.LDC, 'l2_dplus', res_initial.l2_dplus);
 var_names=fieldnames(res_table);
 
 contri_vects =[1 0 -1; 0.5 -1 0.5]';
@@ -86,7 +86,7 @@ for i = 1:nbars
 end
 
 %Tidying up the plot and adding labels
-set(gca, 'XTickLabel', {'Ground Truth','Deming Regression','Voxel Ratio', 'ROI Ratio', 'Z-scoring', 'SVM classification', 'LDC'});
+set(gca, 'XTickLabel', {'Ground Truth','Deming Regression','Voxel Ratio', 'ROI Ratio', 'Z-scoring', 'SVM classification', 'LDC', 'L2 norm'});
 set(gca,'XTickLabelRotation',20);
 ylabel({'Laminar contributions', '(median r \pm 25 percentiles)'});
 x0=10;

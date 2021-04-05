@@ -30,7 +30,7 @@ cmap = cmap/255;
 lmap = lmap/255;
 
 res = load(res_file);  
-res = res.results_exclude;
+res = res.results;
 
 %convert results into matrix form
 res_table = struct();
@@ -52,7 +52,9 @@ end
 % 2. SVM
 % 3. LDC
 % 4. Z-score
+% 5. L2 norm
 
+%--------------------------------------------------------------------------------------------
 %Plotting selectivity
 data(:,1,:)=res_table.deming_ratio;
 data(:,2,:)=res_table.raw_ratio; 
@@ -99,7 +101,8 @@ saveas(gcf,fname,'png');
 hold off
 
 
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting Z scoring
 data = res_table.zscore;
 figure
 att_plot=bar(squeeze(nanmedian(data,1)));
@@ -138,7 +141,8 @@ saveas(gcf,fname,'png');
 hold off
 
 
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting SVM
 data = res_table.SVM;
 figure
 att_plot=bar(squeeze(nanmedian(data,1)));
@@ -178,7 +182,8 @@ saveas(gcf,fname,'png');
 hold off
 
 
-%Plot the data
+%--------------------------------------------------------------------------------------------
+%Plotting LDC
 data = res_table.LDC;
 figure
 att_plot=bar(squeeze(nanmedian(data,1)));
@@ -216,5 +221,49 @@ set(gcf,'position',[x0,y0,width,height])
 fname = 'plot_4.png';
 saveas(gcf,fname,'png');
 hold off
+
+%--------------------------------------------------------------------------------------------
+%Plotting l2_dplus
+data = res_table.l2_dplus;
+figure
+att_plot=bar(squeeze(nanmedian(data,1)));
+hold on
+att_plot.FaceColor = 'flat';
+for b=1:3
+    att_plot.CData(b,:) = cmap(b,:);
+end
+
+
+%Add error bars
+clear xData
+for b=1:3
+    xData(b) = att_plot.XData(b);
+end
+for sub=1:6
+    sp = plot(xData,[squeeze(data(sub,:))],'-o','MarkerSize',5);
+    sp.Color = lmap(sub,:);
+end
+
+
+%Tidying up the plot and adding labels
+xticks([2])
+set(gca, 'XTickLabel', {'L2 norm'});
+set(gca,'XTickLabelRotation',20);
+%ylim([60 100]);
+ylabel('Region-mean contrast estimate (A.U.)');
+x0=10;
+y0=10;
+width=180;
+height=500;
+set(gcf,'position',[x0,y0,width,height])
+
+%save figure
+fname = 'plot_5.png';
+saveas(gcf,fname,'png');
+hold off
+
+%--------------------------------------------------------------------------------------------
+
+
 close all
 end
