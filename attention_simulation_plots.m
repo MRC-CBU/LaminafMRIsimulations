@@ -103,7 +103,7 @@ end
 
 %Tidying up the plot and adding labels
 xticks([2])
-set(gca, 'XTickLabel', {'Measured Response'});
+set(gca, 'XTickLabel', {'Simulated Response'});
 set(gca,'XTickLabelRotation',20);
 % ylim([0 2.5]);
 ylabel({'Attentional modulation', '(median \pm25 percentiles)'});

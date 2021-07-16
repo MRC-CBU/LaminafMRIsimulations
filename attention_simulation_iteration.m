@@ -6,8 +6,10 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_pa
     
     % let's suppose this example ROI has more face cells than house cells (let's call it FFA)
     % Calculating this here so that each iteration can have different frequencies
-    n_neurons.face = abs(normrnd(0,sim_par.n_neurons_face_sigma,[1, n_voxels]));
-    n_neurons.house = abs(normrnd(0,sim_par.n_neurons_house_sigma,[1, n_voxels]));
+    face_sigma = abs(normrnd(sim_par.n_neurons_face_sigma, sim_par.n_neurons_house_sigma/2));
+    house_sigma = abs(normrnd(sim_par.n_neurons_house_sigma, sim_par.n_neurons_house_sigma/2));
+    n_neurons.face = abs(normrnd(0,face_sigma,[1, n_voxels]));
+    n_neurons.house = abs(normrnd(0,house_sigma,[1, n_voxels]));
     
     
     %======================================================================
