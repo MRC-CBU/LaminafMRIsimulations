@@ -36,6 +36,8 @@ sim_par.n_subruns = 4; %no of subruns per attention condition (TaskD+/TaskD-)
 sim_par.n_neurons_face_sigma = 1.1; % sigma of half-Gaussian controlling face cell frequency per voxel
 sim_par.n_neurons_house_sigma = 0.5; % same for house cell frequency
 
+sim_par.n_neurons_pop_sigma = 0.25; % inter-subject variability
+
 % two noise sources at voxel level 
 % Physiological noise that scales with laminar bias
 physio_sigma_list = [11];
