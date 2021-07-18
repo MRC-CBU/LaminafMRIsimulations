@@ -9,6 +9,7 @@ function [estimates, plot_vars] = attention_simulation_iteration(n_voxels,sim_pa
     face_sigma = -1;
     house_sigma = -1;
     while abs(face_sigma-sim_par.n_neurons_face_sigma) > sim_par.n_neurons_face_sigma  && abs(house_sigma-sim_par.n_neurons_house_sigma) > sim_par.n_neurons_face_sigma
+    % Truncating the gaussian at both ends so that there are no negative values of sigma
         face_sigma = normrnd(sim_par.n_neurons_face_sigma, sim_par.n_neurons_pop_sigma);
         house_sigma = normrnd(sim_par.n_neurons_house_sigma, sim_par.n_neurons_pop_sigma);
     end
